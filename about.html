@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>關於本站 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="index.html">首頁</a>
+  <a href="map.html">概念地圖</a>
+  <a href="learning-path.html">學習路線</a>
+  <a href="install.html">安裝指南</a>
+  <a href="docs/index.html">文件教學</a>
+  <a href="docs/code/index.html">程式碼對照</a>
+  <a href="docs/worked.html">實作案例</a>
+  <a href="about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 回首頁</a></div>
+<header>
+  <h1>關於本站</h1>
+  <div class="subtitle">授權、方法、與重要聲明</div>
+</header>
+
+<div class="guide">
+
+<div class="license-box">
+<strong>免責聲明</strong>：本站為 <strong>第三方社群教學站</strong>，與 <strong>Graphify Labs 無關</strong>，不代表 Graphify 官方立場。Graphify 為 Graphify Labs（YC S26）的商標，本站僅在「描述性/教學」語境下使用該名稱。
+</div>
+
+<h2>授權</h2>
+<p>上游 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 以 <strong>Apache License 2.0</strong> 授權（另附 MIT 部分的 <code>LICENSE-MIT</code> 與版權聲明 <code>NOTICE</code>）。本站遵循 Apache-2.0 的要求，照抄了三份授權檔：</p>
+<ul>
+<li><a href="LICENSE">LICENSE</a> — Apache-2.0 全文</li>
+<li><a href="LICENSE-MIT">LICENSE-MIT</a> — 重新授權前以 MIT 貢獻的部分</li>
+<li><a href="NOTICE">NOTICE</a> — "Graphify Copyright 2026 Safi Shamsi and the Graphify contributors"</li>
+</ul>
+<p>本站修改內容（中文解說、網站排版）以 Apache-2.0 釋出，並標記本站為「非官方」衍生站。官方 <code>docs/graph-hero.png</code> 與 <code>docs/demo-path.svg</code> 為上游 docs 資產，本站引用並標註出處；未使用官方 logo 作為網站視覺。</p>
+
+<h2>上游版本釘選</h2>
+<div class="sync-panel"><div class="sync-meta">對齊上游 <code>Graphify-Labs/graphify</code> 分支 <code>v8</code>（<code>9f25a3a</code>）· <code>check-upstream</code> workflow 每月檢查一次。</div></div>
+
+<h2>教學方法</h2>
+<ol class="timeline">
+<li><span class="t-stage">中英對照</span>中文口語解說為主文，英文原文與程式碼保留上游原貌（文件頁用可展開的原文、程式碼頁用註解版原始碼）。</li>
+<li><span class="t-stage">程式碼逐函數</span>所有講到的函數一個 <code>&lt;details&gt;</code> 收縮塊（signature + 中文用途 + 關鍵邏輯），核心函數附逐行中文註解；短函數用段落式說明。</li>
+<li><span class="t-stage">策展而非鏡像</span>700+ 檔案的 repo 不逐檔翻譯，挑「值得教學」的文件與程式碼深入講解，其餘以清單/地圖呈現。</li>
+<li><span class="t-stage">實機示範</span>收錄真實 graphify 產出（互動圖、GRAPH_REPORT），訪客可直接操作，並提供可重現步驟。</li>
+</ol>
+
+<h2>關於 Graphify</h2>
+<p>Graphify 是一個開源工具：在你的 AI 程式碼助手中輸入 <code>/graphify</code>，它會用 tree-sitter 在本機把整個專案解析成可查詢的知識圖譜。程式碼在本機處理（零 LLM、零 token 成本），社群偵測用 Leiden 演算法，每次查詢比讀原始檔省 71.5 倍 token。</p>
+<ul>
+<li>官方 repo：<a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a></li>
+<li>官方網站：<a href="https://graphify.com">graphify.com</a></li>
+<li>PyPI 套件：<code>graphifyy</code>（雙 y）</li>
+<li>作者：Safi Shamsi 與 Graphify contributors</li>
+</ul>
+
+<h2>本站架構</h2>
+<p>純 HTML + CSS + JS 靜態站，無框架、無建置步驟，部署於 GitHub Pages（<code>main</code> 根目錄）。由 OpenCode 協助建置，中文解說由 OpenCode 撰寫。</p>
+<ul>
+<li>本站 repo：<a href="https://github.com/Shuming-Yang/graphify-zh-tw">Shuming-Yang/graphify-zh-tw</a></li>
+</ul>
+
+<div class="callout info"><strong>回饋</strong>：這是教學站，不是官方文件。發現翻譯錯誤或想補充主題，歡迎在 <a href="https://github.com/Shuming-Yang/graphify-zh-tw/issues">本站 repo issues</a> 提出。</div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

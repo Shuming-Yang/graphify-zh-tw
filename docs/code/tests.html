@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>程式碼對照 · tests 測試策略 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>tests/：測試策略與 fixtures 設計</h1>
+  <div class="subtitle">140+ 測試檔、30+ 語言的 sample fixture——怎麼測「多語言 AST 解析」</div>
+  <div class="badge-line">檔案：<code>tests/</code>（約 140 檔）· <code>tests/fixtures/</code></div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p>ARCHITECTURE.md 講得很清楚：<strong>一個模組一個測試檔</strong>，全部是純單元測試——不碰網路、不寫 <code>tmp_path</code> 以外的檔案系統。跑法：<code>pytest tests/ -q</code>。</p>
+<p>測試量很大（<code>test_extract.py</code> 136KB、<code>test_detect.py</code> 117KB、<code>test_watch.py</code> 135KB、<code>test_languages.py</code> 122KB…），所以這頁是「策略導覽」而不是逐檔翻譯。</p>
+
+<h2>1. fixtures 設計：一語料庫，多語言</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">tests/fixtures/sample.*</span> <span class="fn-tag">tests/fixtures/</span><span class="fn-one-liner">每個支援語言都有一份「同一支範例程式」，測法統一。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>fixtures 目錄的心臟是 30+ 個 <code>sample.&lt;ext&gt;</code> 檔案——<code>sample.py</code>、<code>sample.ts</code>、<code>sample.rs</code>、<code>sample.go</code>、<code>sample.java</code>、<code>sample.sql</code>、<code>sample.pas</code>、<code>sample.sv</code>（SystemVerilog）…每種語言一份小樣本。</p>
+<p>這讓 <code>test_languages.py</code> 可以用同一套斷言邏輯測所有語言：每個 fixture 都有個別或跨語言的名稱解析測例（<code>test_cross_language_call_resolution</code>、<code>test_csharp_member_calls</code>、<code>test_swift_cross_file_calls</code>、<code>test_java_type_resolution</code>…）。</p>
+<p>特殊語料按場景放：<code>cpp_logger/a</code> vs <code>cpp_logger/b</code>（同名檔衝突）、<code>swift_cross_file/</code>（extension）、<code>xaml_viewmodel/</code>（XAML+ViewModels）、<code>pascal_cross_file/</code>、<code>objc_mixed/</code>、<code>crate_a</code>/<code>crate_b</code>（Cargo workspace）。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">graphify-out/fixtures 快取</span> <span class="fn-tag">tests/fixtures/graphify-out/cache/</span><span class="fn-one-liner">預先算好的抽取快取，讓測試不必真的跑 tree-sitter。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：fixtures 裡有幾個 <code>graphify-out/cache/&lt;sha&gt;.json</code>——預先抽取好的結果。測試直接載入快取，驗證「快取載入 → 建圖」這條路徑，不必每次真的解析。這也測試了快取格式的相容性（改快取格式時這裡會炸）。</p>
+</div>
+</div>
+</details>
+
+<h2>2. 代表測試檔</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">test_cluster.py（3KB，全文可讀）</span> <span class="fn-tag">tests/test_cluster.py</span><span class="fn-one-liner">小而完整的測試示範。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>這個檔是「測一個純函數模組」的範本，值得整檔讀：</p>
+<ul>
+<li><code>make_graph()</code> 用 <code>build_from_json</code> 從 fixtures 的 <code>extraction.json</code> 建圖——所有測試共用。</li>
+<li>行為測試：<code>cluster</code> 回傳 dict、覆蓋所有節點、<code>cohesion_score</code> 的極端值（complete=1.0、單節點=1.0、disconnected=0.0）。</li>
+<li><strong>capsys 測試</strong>（很有特色）：<code>test_cluster_does_not_write_to_stdout</code> 用 pytest 的 <code>capsys</code> fixture 驗證 cluster 不會寫 stdout、stderr 不含 ANSI 碼——直接對應 <a href="pipeline.html">cluster._partition</a> 的「擋 ANSI」行為（issue #19）。</li>
+<li>確定性測試：<code>remap_communities_to_previous</code> 重用舊 ID、新社群給確定性新 ID。</li>
+</ul>
+<div class="anno-para"><strong>教學重點</strong>：這個測試檔把「純函數 + 固定 fixture + 行為/邊界/副作用/確定性」四種測試一次示範完。3KB 而已。</div>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">test_validate.py · test_languages.py · test_build.py 等</span> <span class="fn-tag">tests/</span><span class="fn-one-liner">schema 驗證、語言矩陣、建圖整合。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：</p>
+<ul>
+<li><code>test_validate.py</code> — 對 <code>validate_extraction</code> 的 schema 測試：缺 nodes/edges key、非 dict、非法 <code>file_type</code>（<code>video</code> 不是允許值）、非法 confidence…</li>
+<li><code>test_languages.py</code>（122KB，最大的語言矩陣）— 每個語言的抽取正確性。</li>
+<li><code>test_build.py</code>（67KB）— 建圖整合，含 hyperedges、ghost 合併、檔案消歧。</li>
+<li><code>test_dedup.py</code>（40KB）— 去重管線逐步測試（對應 <a href="ops.html">dedup</a> 的設計）。</li>
+<li><code>test_incremental.py</code> / <code>test_cache.py</code> — 增量與快取（對應 <a href="../incremental.html">增量設計</a>）。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<h2>3. 一個值得注意的 macOS 註記</h2>
+<details class="fn-block">
+<summary><span class="fn-name">sample.f90 vs sample.F90</span> <span class="fn-tag">README 開發章節</span><span class="fn-one-liner">大小寫不敏感的檔案系統會撞檔。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>README 的 contributing 章節提醒：測試套件同時有 <code>sample.f90</code> 與 <code>sample.F90</code>（Fortran 兩種大小寫副檔名）。在 macOS 的 HFS+/APFS（大小寫不敏感）上這兩個檔會撞在一起——要同時測兩種 Fortran 變體得在 Linux 或 Docker 跑。</p>
+<p class="hint">教學價值：一個跨平台專案連「測試檔命名」都要考慮檔案系統大小寫。實務上的 workaround 之一是把區分移到目錄層級。</p>
+</div>
+</div>
+</details>
+
+<div class="callout"><strong>看完這頁你應該能說出</strong>：fixtures 怎麼支援 30+ 語言、capsys 測了什麼、為什麼要預先算好快取 fixture。測試策略與「<a href="../architecture.html">新增一個語言</a>」的貢獻流程直接呼應——加語言就要加 fixture + <code>test_languages.py</code> 測例。</div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

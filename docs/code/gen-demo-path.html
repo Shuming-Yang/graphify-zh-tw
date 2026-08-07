@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>程式碼對照 · scripts/gen_demo_path.py · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>scripts/gen_demo_path.py：README 首圖的動畫生成器</h1>
+  <div class="subtitle">用程式產出「terminal 輸入指令 → 圖路徑逐跳亮起」的 SMIL/CSS 動畫 SVG</div>
+  <div class="badge-line">檔案：<code>scripts/gen_demo_path.py</code>（10KB）· 產出 <code>docs/demo-path.svg</code></div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p>Graphify README 的第一張圖（<code>docs/demo-path.svg</code>，本站 <a href="../../index.html">首頁</a> 也用了）不是手繪的——是這個腳本產生的動畫 SVG。畫面：左邊一個終端機正在輸入 <code>graphify path "FastAPI" "ModelField"</code>，右邊同一張圖自己畫出來，一次點亮一跳，其餘節點保持暗淡。</p>
+<p>docstring 列了它遵守的約束（這是「怎麼做程式化視覺化」的絕佳教材）：</p>
+<ul>
+<li><strong>純 SMIL/CSS</strong> 在 <code>&lt;img&gt;</code> 引用的 SVG 內——能通過 GitHub 的 sanitizer、無 JS、無外部字型。</li>
+<li><strong>品牌色票</strong>：只准暗色墨綠卡 + 單一 emerald 綠（<code>#4db18f</code> 家族）強調色，無亮粉霓虹。</li>
+<li><strong>單一 10 秒主週期</strong>：每個 <code>&lt;animate&gt;</code> 是 <code>dur=10s repeatCount=indefinite</code>，循環點前回到起始狀態，無縫迴圈。</li>
+</ul>
+
+<h2>關鍵函數</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">kt(pairs) · op0() · reveal(t, hold_val, start_val)</span> <span class="fn-tag">gen_demo_path.py</span><span class="fn-one-liner">SMIL 時間軸的三個小工具。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>三個 helper 組出 SMIL 的 keyTimes/values：</p>
+<ul>
+<li><code>kt(*pairs)</code> — 把 <code>(keyTime, value)</code> 對轉成 <code>values</code> 與 <code>keyTimes</code> 字串，且把 <code>0.9500</code> 這種數字收乾淨。</li>
+<li><code>op0()</code> — 元素的初始 opacity（<code>STATIC=1</code> 時是 1，bake 靜態 frame 做視覺 QA；否則 0，等動畫亮起）。</li>
+<li><code>reveal(t, hold, start)</code> — 產生「在 t 秒亮起 → 保持 → 循環前淡出」的 <code>&lt;animate attributeName="opacity"&gt;</code>。這是「路徑逐跳點亮」的核心——每個 hop 有自己的亮起時間，錯開就形成脈衝效果。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">主程式：SVG 組裝 + 打字機動畫</span> <span class="fn-tag">gen_demo_path.py</span><span class="fn-one-liner">檔頭漸層、terminal、游標、圖路徑的產生。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>主體是一串 <code>out.append(…)</code> 的組裝：</p>
+<ul>
+<li><strong>SVG header + defs</strong>：背景線性漸層、glow 放射漸層、macOS 三色燈。</li>
+<li><strong>終端機打字</strong>：把 <code>graphify path "FastAPI" "ModelField"</code> 逐字元輸出，每個字元 <code>reveal(t)</code>（<code>t = 0.35 + i*0.058</code>，錯開模擬打字）。</li>
+<li><strong>閃爍游標</strong>：用 <code>&lt;animate attributeName="x"&gt;</code> 讓游標沿字元位置走、最後原地閃爍。</li>
+<li>後面（未全部列出）是右邊圖的節點/邊：每條路徑的節點與邊依序亮起、其餘暗淡——用同樣的 reveal 機制。</li>
+</ul>
+<p>執行：<code>python3 scripts/gen_demo_path.py</code> → 寫出 <code>docs/demo-path.svg</code>；<code>STATIC=1</code> 時 bake 靜態 frame。</p>
+</div>
+</div>
+</details>
+
+<div class="callout"><strong>看完這頁你應該能說出</strong>：為什麼用 SMIL 而非 JS、<code>reveal()</code> 怎麼做出「逐跳點亮」、<code>STATIC=1</code> 是幹嘛的。這是一個「把產品 demo 也當成程式化資產」的好例子——圖更新時重跑一次就好，不用手工重畫。</div>
+
+<p class="hint">實際產出：<code>assets/demo-path.svg</code>（本站首頁使用，來源標註於 <a href="../../about.html">關於</a>）。</p>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

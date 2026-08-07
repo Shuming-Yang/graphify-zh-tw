@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>實作案例 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="../index.html">← 回首頁</a></div>
+<header>
+  <h1>實作案例</h1>
+  <div class="subtitle">/worked 五個真實案例的產出展示——還有你可以直接玩的互動圖</div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p><code>worked/</code> 是 Graphify 的「真實產出收藏」。每個資料夾都有：<code>README.md</code>（語料說明 + 重現步驟）、<code>GRAPH_REPORT.md</code>（真實報告）、<code>graph.json</code>、<code>review.md</code>（誠實的成效評估——包括圖哪裡搞錯了）。README 的 contributing 章節也明說：<strong>worked examples 是最有用的貢獻</strong>。</p>
+<p>這頁從最大到最小展示，並放上 rsl-siege-manager 的<strong>互動知識圖譜</strong>——那是真正可操作的 graphify 產出，英文與中文界面兩版。</p>
+
+<h2>案例總覽</h2>
+<div class="case-grid">
+  <div class="case-card">
+    <span class="cc-name">rsl-siege-manager</span>
+    <span class="cc-en">Python + TypeScript monorepo · 真實專案 · 1886 節點</span>
+    <span class="cc-desc">真實網頁 app：FastAPI 後端 + React/Vite 前端 + Python Discord bot，全在一個 repo。三語言跨檔案解析、17 個 Alembic migration、三層架構的社群偵測——本站互動圖的主角。</span>
+    <span class="cc-meta"><span class="c-tag">graph.html 可互動</span><span class="c-tag">tests included</span></span>
+  </div>
+  <div class="case-card">
+    <span class="cc-name">karpathy-repos</span>
+    <span class="cc-en">3 repos + 5 papers + 4 images · 52 檔</span>
+    <span class="cc-desc">產出 71.5× token 節省基準的語料。nanoGPT / minGPT / micrograd 三 repo + 5 篇論文 + 圖片，跨 repo 與論文橋接。</span>
+    <span class="cc-meta"><span class="c-tag">71.5× reduction</span></span>
+  </div>
+  <div class="case-card">
+    <span class="cc-name">httpx</span>
+    <span class="cc-en">合成 Python 函式庫 · 6 檔</span>
+    <span class="cc-desc">仿照 httpx 架構的合成語料：exceptions → models → auth/transport → client 乾淨分層。144 節點、6 社群。</span>
+    <span class="cc-meta"><span class="c-tag">小語料 · 結構價值</span></span>
+  </div>
+  <div class="case-card">
+    <span class="cc-name">mixed-corpus</span>
+    <span class="cc-en">Python + markdown 論文 + 圖片 · 5 檔</span>
+    <span class="cc-desc">混合輸入：3 個 Python 模組 + 一篇帶 arXiv 引用的論文筆記 + 一張圖。測試不同檔案型別在同一次 run 的處理。</span>
+    <span class="cc-meta"><span class="c-tag">5.4× reduction</span></span>
+  </div>
+  <div class="case-card">
+    <span class="cc-name">example</span>
+    <span class="cc-en">小文件管線 · 7 檔 · 2 種語言</span>
+    <span class="cc-desc">可重現的最小範例：parser → validator → processor → storage → api，純 AST + markdown、零語意抽取成本。新手最好從這裡跑起。</span>
+    <span class="cc-meta"><span class="c-tag">新手入門</span></span>
+  </div>
+</div>
+
+<hr>
+
+<h2>🎮 互動知識圖譜：rsl-siege-manager</h2>
+<p>下面這個圖是 <strong>graphify 真實產出</strong>（上游 v8，commit 6085fd66）。1886 節點、3876 邊、141 社群。可以拖曳、滾輪縮放、搜尋節點、點節點看資訊、用社群圖例勾選隱藏。兩個版本：英文原版與中文界面版（節點名稱是程式識別符，兩版都保持英文）。</p>
+
+<div class="graph-embed">
+  <div class="graph-embed-bar">
+    <span class="g-title">rsl-siege-manager 知識圖譜（中文界面）</span>
+    <span class="g-links">
+      <a href="worked/rsl-siege-manager/graph-zh.html" target="_blank">開新分頁 ↗</a>
+      <a href="worked/rsl-siege-manager/graph.html" target="_blank">英文版 ↗</a>
+    </span>
+  </div>
+  <iframe src="worked/rsl-siege-manager/graph-zh.html" title="rsl-siege-manager 知識圖譜（中文界面）"></iframe>
+</div>
+
+<p class="hint">註：<code>graph.html</code> 為 1.8MB 自含檔（資料全部內嵌），首次載入需要一點時間。節點 label 為程式識別符，故兩版皆保留英文；僅 UI 界面中文化。</p>
+
+<hr>
+
+<h2>真實報告長什麼樣</h2>
+<p>以 httpx 案例的 <code>GRAPH_REPORT.md</code> 為例（這就是你的 AI 助手會讀的第一份東西）：</p>
+<details class="en-toggle"><summary>展開英文原文：httpx GRAPH_REPORT.md（節錄）</summary><div>
+<pre><code># Graph Report - worked/httpx/raw  (2026-04-05)
+
+## Corpus Check
+- 6 files · ~2,047 words
+- Verdict: corpus is large enough that graph structure adds value.
+
+## Summary
+- 144 nodes · 330 edges · 6 communities detected
+- Extraction: 53% EXTRACTED · 47% INFERRED · 0% AMBIGUOUS
+- Token cost: 0 input · 0 output
+
+## God Nodes (most connected - your core abstractions)
+1. `Client` - 26 edges
+2. `AsyncClient` - 25 edges
+3. `Response` - 24 edges
+4. `Request` - 21 edges
+5. `BaseClient` - 18 edges
+...
+
+## Surprising Connections
+- `Timeout` --uses--> `URL`  [INFERRED]
+  worked/httpx/raw/client.py → worked/httpx/raw/models.py
+...</code></pre>
+</div></details>
+<p class="hint">注意「Token cost: 0」——純程式碼語料零 LLM。而 <code>--uses--&gt;</code> 邊帶 <code>[INFERRED]</code> 標籤，就是 <a href="../map.html">信任標籤</a> 在報告上的體現。</p>
+
+<h2>每個案例的「預期結果」</h2>
+<table>
+<tr><th>案例</th><th>預期</th></tr>
+<tr><td>example</td><td><code>api.py</code> 是連到四模組的 hub；<code>storage.py</code> 是最高度數 god node；<code>parser.py</code> 呼叫 validator/storage；架構筆記連回程式碼；2 社群。</td></tr>
+<tr><td>httpx</td><td>144 節點 / 330 邊 / 6 社群；god nodes = <code>Client</code>、<code>AsyncClient</code>、<code>Response</code>…；驚喜連線：<code>DigestAuth</code> 連到 <code>Response</code>（auth.py 讀 Response 解析 WWW-Authenticate）。</td></tr>
+<tr><td>karpathy-repos</td><td>~285 節點 / ~340 邊 / ~17 社群；god nodes = <code>Value</code>（micrograd）、<code>GPT</code>（nanoGPT）；驚喜：nanoGPT 與 minGPT 的 Block 跨 repo 相連、FlashAttention 論文橋進兩個 repo 的 CausalSelfAttention。</td></tr>
+<tr><td>mixed-corpus</td><td>AST 就有 ~20 節點 / ~19 邊 / 3 社群（Graph Analysis / Clustering / Graph Building）；<code>attention_notes.md</code> 被歸類為 paper（arXiv heuristic 命中 <code>1706.03762</code>）。</td></tr>
+<tr><td>rsl-siege-manager</td><td>1886 節點 / 3876 邊 / 141 社群（89 shown）；90% EXTRACTED；`built_at_commit: 6085fd66`。</td></tr>
+</table>
+
+<h2>自己重現</h2>
+<p>每個案例的 <code>README.md</code> 都有重現步驟，共通流程：</p>
+<pre><code># 例如 httpx
+cd worked/httpx
+graphify extract ./raw     # 純程式碼，不需 API key
+# 或開你的 AI 助手輸入：
+/graphify ./raw</code></pre>
+<p>跑完檢查 <code>graphify-out/</code>：<code>GRAPH_REPORT.md</code>（報告）、<code>graph.html</code>（互動圖）、<code>graph.json</code>（資料）。用 <code>graphify benchmark worked/httpx/graph.json</code> 可以驗證 README 宣稱的數字。</p>
+
+<div class="callout"><strong>進階練習</strong>：跑完 httpx 後，試 <code>graphify path "DigestAuth" "Response"</code> 與 <code>graphify explain "Client"</code>——看輸出的路徑與 <code>[EXTRACTED]/[INFERRED]</code> 標籤，再對照 <code>GRAPH_REPORT.md</code> 的 Surprising Connections，你就實際體驗了「用圖取代 grep」。</div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>程式碼對照 · skillgen · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>tools/skillgen：技能檔的產生器</h1>
+  <div class="subtitle">SKILL.md 不是手寫的——是從 fragments 渲染出來的，還有防 drift 校驗</div>
+  <div class="badge-line">檔案：<code>tools/skillgen/</code>（gen.py 54KB · platforms.toml 12KB · fragments/ · expected/）</div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p>這是「<a href="../skill-files.html">技能檔結構</a>」的生產端。核心哲學（docstring 一開頭就講）：</p>
+<blockquote>Fragments under <code>tools/skillgen/fragments/</code> are the single source of truth a human edits; the files under <code>graphify/skill*.md</code> and <code>graphify/skills/&lt;platform&gt;/references/</code> are generated, committed artifacts.</blockquote>
+<p>也就是：人只編輯 fragments，機器渲染出所有平台的 skill 成品。render 是冪等的（固定順序、按名排序、LF 換行、產出檔不含時間戳），並用 <code>expected/</code> 當 baseline 擋住 drift。</p>
+
+<h2>使用方式（docstring）</h2>
+<pre><code>python -m tools.skillgen                  # 重新產生所有平台的 artifacts
+python -m tools.skillgen --platform claude
+python -m tools.skillgen --check          # byte-diff 渲染 vs 已提交 + expected/，有 drift 就 exit 1
+python -m tools.skillgen --audit-coverage # 每個 host：驗證該 host 的 v8 body 每節都住在自己渲染裡
+python -m tools.skillgen --schema-singleton # 驗證 file_type enum 到處 byte-identical
+python -m tools.skillgen --monolith-roundtrip # 驗證每個 monolith == v8 modulo enum
+python -m tools.skillgen --always-on-roundtrip # 驗證每個 always_on/*.md 重現其舊常數
+python -m tools.skillgen --bless          # 用目前渲染重寫 expected/</code></pre>
+
+<hr>
+
+<h2>關鍵函數</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">class Platform · load_platforms()</span> <span class="fn-tag">gen.py:265 / 301</span><span class="fn-one-liner">platforms.toml 的載入與型別化。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p><code>platforms.toml</code> 宣告每個 host 怎麼組裝 skill：<code>bucket</code>（split 或 monolith）、<code>core</code>（split 用的 core 模板）、<code>skill_dst</code> / <code>refs_dst</code>（輸出位置）、<code>name</code> / <code>description</code>（frontmatter，description 各平台 verbatim 保留）、<code>dispatch</code>（Part-B dispatch fragment）、<code>extraction</code>（verbose/compact，選 extraction-spec 的內容）、<code>shell</code>（posix/powershell）、<code>claude_md</code>、<code>hooks_variant</code>、<code>extra_sections</code>、<code>monolith</code>。</p>
+<p><code>load_platforms()</code> 用 <code>tomllib</code> 解析（Python 3.10 退回 <code>tomli</code>），每個 <code>[platform.&lt;key&gt;]</code> table 變成一個 <code>Platform</code> 物件。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">render(platform) · _render_core · _render_frontmatter</span> <span class="fn-tag">gen.py:423 / 360 / 347</span><span class="fn-one-liner">把 fragments 組裝成該平台的 SKILL.md 與 references。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>渲染邏輯：</p>
+<ul>
+<li><code>_render_frontmatter(platform)</code> — 產生 <code>---\nname: …\ndescription: …\n---</code>。</li>
+<li><code>_render_core(platform)</code> — 載入 <code>fragments/core/core.md</code>（split 的 lean core 模板），把 platform 的 slot 填進去：dispatch fragment、shell fragment、hooks pointer、extra_sections、reference index。</li>
+<li><code>render(platform)</code> — 回傳 <code>list[RenderedArtifact]</code>（SKILL.md + references/ 側車的渲染結果）。</li>
+<li>references 是「自動組裝」的——platform 只宣告自己的 deltas，共同的（query、extraction-spec、hooks、add-watch…）自動從 <code>fragments/references/shared/</code> 帶上。</li>
+</ul>
+<p class="hint">這解釋了為什麼 17 個平台的 <code>skill-&lt;platform&gt;.md</code> 有 40KB 卻彼此只差一點點——它們共用一個 core 模板。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">check(artifacts) · bless(artifacts)</span> <span class="fn-tag">gen.py:525 / 514</span><span class="fn-one-liner">drift 守門員：check 驗證、bless 重寫 baseline。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>防 drift 的雙向機制：</p>
+<ul>
+<li><code>check()</code> — 把渲染結果與<strong>已提交的檔案</strong>做 byte-diff，再與 <code>expected/</code> 做 byte-diff。任何一個不一致就回報（CI 會 exit 1）。這確保「手改了 generated artifact」或「fragment 改了但沒重新產生」都會被抓到。</li>
+<li><code>bless()</code> — 把目前的渲染結果寫進 <code>expected/</code>（<code>_expected_path</code> 命名 <code>graphify__skill.md</code> 等）——「這是我承認的真相」。改模板時先 bless 再 commit。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">audit_coverage · schema_singleton · *_roundtrip</span> <span class="fn-tag">gen.py:610 / 695 / …</span><span class="fn-one-liner">更嚴格的防護：內容覆蓋、enum 單一、monolith round-trip。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明（skillgen 的「驗證套組」，都是為了讓「拆分 platform」這件事安全）：</p>
+<ul>
+<li><code>audit_coverage(platform)</code> — 用 <code>_V8_BASELINE_SHA</code>（<code>git show</code> 拉 v8 分支的原始 skill body）逐 host 驗證：該 host 自己的 v8 body 每個 heading 都「單一居住」在它自己的渲染裡——一個只影響單一 host 的漏接才看得見。</li>
+<li><code>schema_singleton(platforms)</code> — 驗證 <code>file_type</code> enum 在所有 artifact 裡 byte-identical。</li>
+<li><code>monolith_roundtrip</code> / <code>always_on_roundtrip</code> — 驗證 monolith skill 與 always_on 檔能重現過去的常數。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_is_*_fix_line 家族</span> <span class="fn-tag">gen.py:713-916</span><span class="fn-one-liner">修復檔案的「已知正確」識別器。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：這組 <code>_is_chunk_cleanup_fix_line</code>、<code>_is_zero_node_guard_fix_line</code>、<code>_is_no_api_key_fix_line</code> 等函數，是為「語意修復」判定的——渲染引擎產生內容時，需要識別哪些行屬於特定的歷史修復（例如 zero-node guard、no-API-key 提示），以便穩定地定位/合併。每個都是一個小 predicate，名稱本身就描述了它認得哪一行。</p>
+</div>
+</div>
+</details>
+
+<div class="callout"><strong>看完這頁你應該能說出</strong>：fragments 與 artifacts 的關係、check 與 bless 的差別、為什麼 skill 檔不能直接手改。回到 <a href="../skill-files.html">技能檔結構</a> 再看一次，整個「生成 → 安裝 → 載入」循環就通了。</div>
+
+<p class="hint">下一頁：<a href="gen-demo-path.html">scripts/gen_demo_path.py</a>——README 首圖 SVG 動畫的生成器。</p>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>
