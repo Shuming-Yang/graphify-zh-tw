@@ -1,0 +1,236 @@
+- generic [ref=f7e2]:
+  - navigation [ref=f7e3]:
+    - link "首頁" [ref=f7e4] [cursor=pointer]:
+      - /url: ../index.html
+    - link "概念地圖" [ref=f7e5] [cursor=pointer]:
+      - /url: ../map.html
+    - link "學習路線" [ref=f7e6] [cursor=pointer]:
+      - /url: ../learning-path.html
+    - link "安裝指南" [ref=f7e7] [cursor=pointer]:
+      - /url: ../install.html
+    - link "文件教學" [ref=f7e8] [cursor=pointer]:
+      - /url: index.html
+    - link "程式碼對照" [ref=f7e9] [cursor=pointer]:
+      - /url: code/index.html
+    - link "實作案例" [ref=f7e10] [cursor=pointer]:
+      - /url: worked.html
+    - link "關於" [ref=f7e11] [cursor=pointer]:
+      - /url: ../about.html
+  - link "← 文件教學" [ref=f7e13] [cursor=pointer]:
+    - /url: index.html
+  - banner [ref=f7e14]:
+    - heading "運作原理" [level=1] [ref=f7e15]
+    - generic [ref=f7e16]: 三遍處理、社群偵測、信任標籤、token 經濟學——Graphify 是怎麼工作的
+    - generic [ref=f7e17]:
+      - text: 來源：
+      - code [ref=f7e18]: docs/how-it-works.md
+  - generic [ref=f7e19]:
+    - heading "開場：一件事先講清楚" [level=2] [ref=f7e20]
+    - paragraph [ref=f7e21]:
+      - text: Graphify 之所以省 token，是因為「
+      - strong [ref=f7e22]: 建一次圖，之後都讀圖
+      - text: 」。建圖的第一次要花 token（文件那部分），之後每一次查詢都讀壓縮過的
+      - code [ref=f7e23]: graph.json
+      - text: ，而不是掃原始檔。在一個 52 檔案的混合語料上，每次查詢比直接讀原始檔省
+      - strong [ref=f7e24]: 71.5 倍
+      - text: token。
+    - heading "1. 三遍處理（The three passes）" [level=2] [ref=f7e25]
+    - paragraph [ref=f7e26]: Graphify 把輸入分成三類，用三種不同的方式處理：
+    - heading "Pass 1 — 程式碼結構（免費、不呼叫 API）" [level=3] [ref=f7e27]
+    - list [ref=f7e28]:
+      - listitem [ref=f7e29]: 用 tree-sitter 在本機解析程式碼，抽出類別、函數、import、呼叫圖與行內註解。
+      - listitem [ref=f7e30]:
+        - strong [ref=f7e31]: 全程沒有 LLM
+        - text: ，支援 25+ 種語言（README 說是 36 種文法）。
+      - listitem [ref=f7e32]: SQL 檔特別處理：表格、view、外鍵、JOIN 關係都用確定性方式抽出。
+      - listitem [ref=f7e33]:
+        - text: 如果語料只有程式碼，
+        - strong [ref=f7e34]: Pass 3 整個跳過
+        - text: ——不需要 API key。
+    - heading "Pass 2 — 影音轉錄（本機、不呼叫 API）" [level=3] [ref=f7e35]
+    - list [ref=f7e36]:
+      - listitem [ref=f7e37]:
+        - text: 影片與音訊用 faster-whisper 在
+        - strong [ref=f7e38]: 本機
+        - text: 轉錄。
+      - listitem [ref=f7e39]: 轉錄 prompt 會用目前圖裡的 top god nodes 當種子，聚焦在你的領域。
+      - listitem [ref=f7e40]: 轉錄有快取，重跑會跳過已處理的檔案。
+    - heading "Pass 3 — 文件、論文、圖片（Claude 子代理、花 token）" [level=3] [ref=f7e41]
+    - list [ref=f7e42]:
+      - listitem [ref=f7e43]: Claude 平行處理 markdown、PDF、圖片與轉錄稿。
+      - listitem [ref=f7e44]: 每個子代理讀一批檔案，輸出一個 JSON fragment（nodes、edges、群組關係），最後合併成單一圖。
+      - listitem [ref=f7e45]:
+        - text: 支援的 pointer/binary 格式會先轉成
+        - code [ref=f7e46]: graphify-out/converted/
+        - text: 下的 Markdown sidecar（Office 檔用
+        - code [ref=f7e47]: "[office]"
+        - text: extra；Google Workspace 需
+        - code [ref=f7e48]: "--google-workspace"
+        - text: ）。
+    - group [ref=f7e49]:
+      - generic "▸ 展開英文原文：The three passes" [ref=f7e50] [cursor=pointer]
+    - heading "2. 社群偵測（Leiden 演算法）" [level=2] [ref=f7e51]
+    - paragraph [ref=f7e52]:
+      - text: 社群是用
+      - link "Leiden 演算法" [ref=f7e53] [cursor=pointer]:
+        - /url: https://www.nature.com/articles/s41598-019-41695-z
+      - text: 找出來的——一種「把節點依邊密度分群」的圖分群方法。彼此連線很多的節點會落進同一個社群。
+    - paragraph [ref=f7e54]:
+      - strong [ref=f7e55]: 不需要 embedding
+      - text: 。Claude 抽出的語意相似邊（
+      - code [ref=f7e56]: semantically_similar_to
+      - text: ）本來就在圖裡，直接影響社群形狀——圖的結構本身就是相似度訊號，沒有獨立的 embedding 步驟、也沒有向量資料庫。這是 Graphify「不是向量索引」的核心主張。
+    - group [ref=f7e57]:
+      - generic "▸ 展開英文原文：How community detection works" [ref=f7e58] [cursor=pointer]
+    - heading "3. 信任標籤（Confidence tagging）" [level=2] [ref=f7e59]
+    - paragraph [ref=f7e60]: 每一條關係都貼三種標籤之一：
+    - table [ref=f7e61]:
+      - rowgroup [ref=f7e62]:
+        - row [ref=f7e63]:
+          - columnheader "標籤" [ref=f7e64]
+          - columnheader "意義" [ref=f7e65]
+        - row [ref=f7e66]:
+          - cell [ref=f7e67]:
+            - code [ref=f7e68]: EXTRACTED
+          - cell "直接在原始碼找到（例如一個函數呼叫、一個 import）——confidence 固定 1.0" [ref=f7e69]
+        - row [ref=f7e70]:
+          - cell [ref=f7e71]:
+            - code [ref=f7e72]: INFERRED
+          - cell [ref=f7e73]:
+            - text: Claude 做的合理推論，帶
+            - code [ref=f7e74]: confidence_score
+            - text: （0.0–1.0）
+        - row [ref=f7e75]:
+          - cell [ref=f7e76]:
+            - code [ref=f7e77]: AMBIGUOUS
+          - cell "不確定，在報告中標記供人工檢視" [ref=f7e78]
+    - paragraph [ref=f7e79]:
+      - text: INFERRED 用離散級距：
+      - code [ref=f7e80]: "0.95"
+      - text: 近乎確定（明確跨檔引用）→
+      - code [ref=f7e81]: "0.85"
+      - text: 強證據 →
+      - code [ref=f7e82]: "0.75"
+      - text: 合理 →
+      - code [ref=f7e83]: "0.65"
+      - text: 弱 →
+      - code [ref=f7e84]: "0.55"
+      - text: 臆測。
+    - group [ref=f7e85]:
+      - generic "▸ 展開英文原文：Confidence tagging" [ref=f7e86] [cursor=pointer]
+    - heading "4. Token 基準（Token benchmark）" [level=2] [ref=f7e87]
+    - paragraph [ref=f7e88]:
+      - text: 省 token 的幅度取決於語料大小——
+      - strong [ref=f7e89]: 圖越大，省得越多
+      - text: ：
+    - table [ref=f7e90]:
+      - rowgroup [ref=f7e91]:
+        - row [ref=f7e92]:
+          - columnheader "語料" [ref=f7e93]
+          - columnheader "檔案數" [ref=f7e94]
+          - columnheader "節省倍數" [ref=f7e95]
+        - row [ref=f7e96]:
+          - cell "Karpathy repos + 論文 + 圖片" [ref=f7e97]
+          - cell "52" [ref=f7e98]
+          - cell [ref=f7e99]:
+            - strong [ref=f7e100]: 71.5×
+        - row [ref=f7e101]:
+          - cell "graphify 源碼 + Transformer 論文" [ref=f7e102]
+          - cell "4" [ref=f7e103]
+          - cell "5.4×" [ref=f7e104]
+        - row [ref=f7e105]:
+          - cell "httpx（合成 Python 函式庫）" [ref=f7e106]
+          - cell "6" [ref=f7e107]
+          - cell "~1×" [ref=f7e108]
+    - paragraph [ref=f7e109]:
+      - text: 6 個檔案還在 context window 內，圖的價值是「結構清晰」而不是「壓縮」；到 52 個檔案，省下的 token 就快速累積。repo 裡每個
+      - code [ref=f7e110]: worked/
+      - text: 資料夾都有原始輸入與真實產出，可以自己跑來驗證。
+    - heading "5. 平行抽取與 SHA256 快取" [level=2] [ref=f7e111]
+    - list [ref=f7e112]:
+      - listitem [ref=f7e113]:
+        - strong [ref=f7e114]: 平行抽取
+        - text: ：程式碼檔用
+        - code [ref=f7e115]: ProcessPoolExecutor
+        - text: 平行抽取（繞過 GIL 的真多處理）；文件/論文/圖片用平行 Claude 子代理。84 個程式碼檔的語料，平行 AST 抽取比循序快約 1.66 倍。
+      - listitem [ref=f7e116]:
+        - strong [ref=f7e117]: SHA256 快取
+        - text: ：每個抽取過的檔案用內容雜湊指紋。重跑時未變的檔案整個跳過，只重新抽取新增或修改的檔案。快取放在
+        - code [ref=f7e118]: graphify-out/cache/
+        - text: 。
+    - heading "6. 圖的格式" [level=2] [ref=f7e119]
+    - paragraph [ref=f7e120]:
+      - text: 輸出
+      - code [ref=f7e121]: graph.json
+      - text: 用 NetworkX 的 node-link 格式。每個節點有：
+    - list [ref=f7e122]:
+      - listitem [ref=f7e123]:
+        - code [ref=f7e124]: id
+        - text: — 穩定識別符
+      - listitem [ref=f7e125]:
+        - code [ref=f7e126]: label
+        - text: — 人可讀名稱
+      - listitem [ref=f7e127]:
+        - code [ref=f7e128]: file_type
+        - text: —
+        - code [ref=f7e129]: code
+        - text: /
+        - code [ref=f7e130]: document
+        - text: /
+        - code [ref=f7e131]: paper
+        - text: /
+        - code [ref=f7e132]: image
+        - text: /
+        - code [ref=f7e133]: rationale
+      - listitem [ref=f7e134]:
+        - code [ref=f7e135]: source_file
+        - text: — 來自哪個檔案
+    - paragraph [ref=f7e136]:
+      - text: 每條邊有：
+      - code [ref=f7e137]: source
+      - text: 、
+      - code [ref=f7e138]: target
+      - text: 、
+      - code [ref=f7e139]: relation
+      - text: （動詞片語，如
+      - code [ref=f7e140]: calls
+      - text: 、
+      - code [ref=f7e141]: imports
+      - text: 、
+      - code [ref=f7e142]: semantically_similar_to
+      - text: ）、
+      - code [ref=f7e143]: confidence
+      - text: 、
+      - code [ref=f7e144]: confidence_score
+      - text: （僅 INFERRED）、
+      - code [ref=f7e145]: source_file
+      - text: 。連接 3+ 節點的群組關係（hyperedges）放在
+      - code [ref=f7e146]: G.graph["hyperedges"]
+      - text: 。
+    - group [ref=f7e147]:
+      - generic "▸ 展開英文原文：The graph format" [ref=f7e148] [cursor=pointer]
+    - heading "一句話總結" [level=2] [ref=f7e149]
+    - generic [ref=f7e150]:
+      - strong [ref=f7e151]: 本機確定性抽取（程式碼）＋ 可選 LLM 語意抽取（文件）→ 一張圖 → 用 query/path/explain 讀圖而非掃檔。
+      - text: 程式碼永遠不離開你的機器；只有文件類語料會呼叫你設定的模型。
+    - paragraph [ref=f7e152]:
+      - text: 延伸：
+      - link "架構總覽" [ref=f7e153] [cursor=pointer]:
+        - /url: architecture.html
+      - text: ·
+      - link "效能基準" [ref=f7e154] [cursor=pointer]:
+        - /url: benchmarks.html
+      - text: ·
+      - link "概念地圖" [ref=f7e155] [cursor=pointer]:
+        - /url: ../map.html
+  - contentinfo [ref=f7e156]:
+    - generic [ref=f7e157]:
+      - text: 這是
+      - link "Graphify-Labs/graphify" [ref=f7e158] [cursor=pointer]:
+        - /url: https://github.com/Graphify-Labs/graphify
+      - text: 的非官方繁體中文教學站。
+    - generic [ref=f7e159]:
+      - text: 內容 ©
+      - link "Graphify Labs" [ref=f7e160] [cursor=pointer]:
+        - /url: https://github.com/Graphify-Labs/graphify
+      - text: （Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a

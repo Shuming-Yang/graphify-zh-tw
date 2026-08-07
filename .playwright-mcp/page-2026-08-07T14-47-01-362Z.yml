@@ -1,0 +1,200 @@
+- generic [ref=e2]:
+  - navigation [ref=e3]:
+    - link "首頁" [ref=e4] [cursor=pointer]:
+      - /url: ../index.html
+    - link "概念地圖" [ref=e5] [cursor=pointer]:
+      - /url: ../map.html
+    - link "學習路線" [ref=e6] [cursor=pointer]:
+      - /url: ../learning-path.html
+    - link "安裝指南" [ref=e7] [cursor=pointer]:
+      - /url: ../install.html
+    - link "文件教學" [ref=e8] [cursor=pointer]:
+      - /url: index.html
+    - link "程式碼對照" [ref=e9] [cursor=pointer]:
+      - /url: code/index.html
+    - link "實作案例" [ref=e10] [cursor=pointer]:
+      - /url: worked.html
+    - link "關於" [ref=e11] [cursor=pointer]:
+      - /url: ../about.html
+  - link "← 回首頁" [ref=e13] [cursor=pointer]:
+    - /url: ../index.html
+  - banner [ref=e14]:
+    - heading "實作案例" [level=1] [ref=e15]
+    - generic [ref=e16]: /worked 五個真實案例的產出展示——還有你可以直接玩的互動圖
+  - generic [ref=e17]:
+    - heading "大方向" [level=2] [ref=e18]
+    - paragraph [ref=e19]:
+      - code [ref=e20]: worked/
+      - text: 是 Graphify 的「真實產出收藏」。每個資料夾都有：
+      - code [ref=e21]: README.md
+      - text: （語料說明 + 重現步驟）、
+      - code [ref=e22]: GRAPH_REPORT.md
+      - text: （真實報告）、
+      - code [ref=e23]: graph.json
+      - text: 、
+      - code [ref=e24]: review.md
+      - text: （誠實的成效評估——包括圖哪裡搞錯了）。README 的 contributing 章節也明說：
+      - strong [ref=e25]: worked examples 是最有用的貢獻
+      - text: 。
+    - paragraph [ref=e26]:
+      - text: 這頁從最大到最小展示，並放上 rsl-siege-manager 的
+      - strong [ref=e27]: 互動知識圖譜
+      - text: ——那是真正可操作的 graphify 產出，英文與中文界面兩版。
+    - heading "案例總覽" [level=2] [ref=e28]
+    - generic [ref=e29]:
+      - generic [ref=e30]:
+        - generic [ref=e31]: rsl-siege-manager
+        - generic [ref=e32]: Python + TypeScript monorepo · 真實專案 · 1886 節點
+        - generic [ref=e33]: 真實網頁 app：FastAPI 後端 + React/Vite 前端 + Python Discord bot，全在一個 repo。三語言跨檔案解析、17 個 Alembic migration、三層架構的社群偵測——本站互動圖的主角。
+        - generic [ref=e34]:
+          - generic [ref=e35]: graph.html 可互動
+          - generic [ref=e36]: tests included
+      - generic [ref=e37]:
+        - generic [ref=e38]: karpathy-repos
+        - generic [ref=e39]: 3 repos + 5 papers + 4 images · 52 檔
+        - generic [ref=e40]: 產出 71.5× token 節省基準的語料。nanoGPT / minGPT / micrograd 三 repo + 5 篇論文 + 圖片，跨 repo 與論文橋接。
+        - generic [ref=e41]: 71.5× reduction
+      - generic [ref=e43]:
+        - generic [ref=e44]: httpx
+        - generic [ref=e45]: 合成 Python 函式庫 · 6 檔
+        - generic [ref=e46]: 仿照 httpx 架構的合成語料：exceptions → models → auth/transport → client 乾淨分層。144 節點、6 社群。
+        - generic [ref=e47]: 小語料 · 結構價值
+      - generic [ref=e49]:
+        - generic [ref=e50]: mixed-corpus
+        - generic [ref=e51]: Python + markdown 論文 + 圖片 · 5 檔
+        - generic [ref=e52]: 混合輸入：3 個 Python 模組 + 一篇帶 arXiv 引用的論文筆記 + 一張圖。測試不同檔案型別在同一次 run 的處理。
+        - generic [ref=e53]: 5.4× reduction
+      - generic [ref=e55]:
+        - generic [ref=e56]: example
+        - generic [ref=e57]: 小文件管線 · 7 檔 · 2 種語言
+        - generic [ref=e58]: 可重現的最小範例：parser → validator → processor → storage → api，純 AST + markdown、零語意抽取成本。新手最好從這裡跑起。
+        - generic [ref=e59]: 新手入門
+    - separator [ref=e61]
+    - heading "🎮 互動知識圖譜：rsl-siege-manager" [level=2] [ref=e62]
+    - paragraph [ref=e63]:
+      - text: 下面這個圖是
+      - strong [ref=e64]: graphify 真實產出
+      - text: （上游 v8，commit 6085fd66）。1886 節點、3876 邊、141 社群。可以拖曳、滾輪縮放、搜尋節點、點節點看資訊、用社群圖例勾選隱藏。兩個版本：英文原版與中文界面版（節點名稱是程式識別符，兩版都保持英文）。
+    - generic [ref=e65]:
+      - generic [ref=e66]:
+        - generic [ref=e67]: rsl-siege-manager 知識圖譜（中文界面）
+        - generic [ref=e68]:
+          - link "開新分頁 ↗" [ref=e69] [cursor=pointer]:
+            - /url: worked/rsl-siege-manager/graph-zh.html
+          - link "英文版 ↗" [ref=e70] [cursor=pointer]:
+            - /url: worked/rsl-siege-manager/graph.html
+      - iframe [ref=e71]:
+        - generic [ref=f1e1]:
+          - heading "Error response" [level=1] [ref=f1e2]
+          - paragraph [ref=f1e3]: "Error code: 404"
+          - paragraph [ref=f1e4]: "Message: File not found."
+          - paragraph [ref=f1e5]: "Error code explanation: 404 - Nothing matches the given URI."
+    - paragraph [ref=e72]:
+      - text: 註：
+      - code [ref=e73]: graph.html
+      - text: 為 1.8MB 自含檔（資料全部內嵌），首次載入需要一點時間。節點 label 為程式識別符，故兩版皆保留英文；僅 UI 界面中文化。
+    - separator [ref=e74]
+    - heading "真實報告長什麼樣" [level=2] [ref=e75]
+    - paragraph [ref=e76]:
+      - text: 以 httpx 案例的
+      - code [ref=e77]: GRAPH_REPORT.md
+      - text: 為例（這就是你的 AI 助手會讀的第一份東西）：
+    - group [ref=e78]:
+      - generic "▸ 展開英文原文：httpx GRAPH_REPORT.md（節錄）" [ref=e79] [cursor=pointer]
+    - paragraph [ref=e80]:
+      - text: "注意「Token cost: 0」——純程式碼語料零 LLM。而"
+      - code [ref=e81]: "--uses-->"
+      - text: 邊帶
+      - code [ref=e82]: "[INFERRED]"
+      - text: 標籤，就是
+      - link "信任標籤" [ref=e83] [cursor=pointer]:
+        - /url: ../map.html
+      - text: 在報告上的體現。
+    - heading "每個案例的「預期結果」" [level=2] [ref=e84]
+    - table [ref=e85]:
+      - rowgroup [ref=e86]:
+        - row [ref=e87]:
+          - columnheader "案例" [ref=e88]
+          - columnheader "預期" [ref=e89]
+        - row [ref=e90]:
+          - cell "example" [ref=e91]
+          - cell [ref=e92]:
+            - code [ref=e93]: api.py
+            - text: 是連到四模組的 hub；
+            - code [ref=e94]: storage.py
+            - text: 是最高度數 god node；
+            - code [ref=e95]: parser.py
+            - text: 呼叫 validator/storage；架構筆記連回程式碼；2 社群。
+        - row [ref=e96]:
+          - cell "httpx" [ref=e97]
+          - cell [ref=e98]:
+            - text: 144 節點 / 330 邊 / 6 社群；god nodes =
+            - code [ref=e99]: Client
+            - text: 、
+            - code [ref=e100]: AsyncClient
+            - text: 、
+            - code [ref=e101]: Response
+            - text: …；驚喜連線：
+            - code [ref=e102]: DigestAuth
+            - text: 連到
+            - code [ref=e103]: Response
+            - text: （auth.py 讀 Response 解析 WWW-Authenticate）。
+        - row [ref=e104]:
+          - cell "karpathy-repos" [ref=e105]
+          - cell [ref=e106]:
+            - text: ~285 節點 / ~340 邊 / ~17 社群；god nodes =
+            - code [ref=e107]: Value
+            - text: （micrograd）、
+            - code [ref=e108]: GPT
+            - text: （nanoGPT）；驚喜：nanoGPT 與 minGPT 的 Block 跨 repo 相連、FlashAttention 論文橋進兩個 repo 的 CausalSelfAttention。
+        - row [ref=e109]:
+          - cell "mixed-corpus" [ref=e110]
+          - cell [ref=e111]:
+            - text: AST 就有 ~20 節點 / ~19 邊 / 3 社群（Graph Analysis / Clustering / Graph Building）；
+            - code [ref=e112]: attention_notes.md
+            - text: 被歸類為 paper（arXiv heuristic 命中
+            - code [ref=e113]: "1706.03762"
+            - text: ）。
+        - row [ref=e114]:
+          - cell "rsl-siege-manager" [ref=e115]
+          - 'cell "1886 節點 / 3876 邊 / 141 社群（89 shown）；90% EXTRACTED；`built_at_commit: 6085fd66`。" [ref=e116]'
+    - heading "自己重現" [level=2] [ref=e117]
+    - paragraph [ref=e118]:
+      - text: 每個案例的
+      - code [ref=e119]: README.md
+      - text: 都有重現步驟，共通流程：
+    - code [ref=e121]: "# 例如 httpx cd worked/httpx graphify extract ./raw # 純程式碼，不需 API key # 或開你的 AI 助手輸入： /graphify ./raw"
+    - paragraph [ref=e122]:
+      - text: 跑完檢查
+      - code [ref=e123]: graphify-out/
+      - text: ：
+      - code [ref=e124]: GRAPH_REPORT.md
+      - text: （報告）、
+      - code [ref=e125]: graph.html
+      - text: （互動圖）、
+      - code [ref=e126]: graph.json
+      - text: （資料）。用
+      - code [ref=e127]: graphify benchmark worked/httpx/graph.json
+      - text: 可以驗證 README 宣稱的數字。
+    - generic [ref=e128]:
+      - strong [ref=e129]: 進階練習
+      - text: ：跑完 httpx 後，試
+      - code [ref=e130]: graphify path "DigestAuth" "Response"
+      - text: 與
+      - code [ref=e131]: graphify explain "Client"
+      - text: ——看輸出的路徑與
+      - code [ref=e132]: "[EXTRACTED]/[INFERRED]"
+      - text: 標籤，再對照
+      - code [ref=e133]: GRAPH_REPORT.md
+      - text: 的 Surprising Connections，你就實際體驗了「用圖取代 grep」。
+  - contentinfo [ref=e134]:
+    - generic [ref=e135]:
+      - text: 這是
+      - link "Graphify-Labs/graphify" [ref=e136] [cursor=pointer]:
+        - /url: https://github.com/Graphify-Labs/graphify
+      - text: 的非官方繁體中文教學站。
+    - generic [ref=e137]:
+      - text: 內容 ©
+      - link "Graphify Labs" [ref=e138] [cursor=pointer]:
+        - /url: https://github.com/Graphify-Labs/graphify
+      - text: （Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a

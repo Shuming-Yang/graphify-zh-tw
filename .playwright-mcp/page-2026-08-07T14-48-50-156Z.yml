@@ -1,0 +1,518 @@
+- generic [ref=f8e2]:
+  - navigation [ref=f8e3]:
+    - link "首頁" [ref=f8e4] [cursor=pointer]:
+      - /url: ../../index.html
+    - link "概念地圖" [ref=f8e5] [cursor=pointer]:
+      - /url: ../../map.html
+    - link "學習路線" [ref=f8e6] [cursor=pointer]:
+      - /url: ../../learning-path.html
+    - link "安裝指南" [ref=f8e7] [cursor=pointer]:
+      - /url: ../../install.html
+    - link "文件教學" [ref=f8e8] [cursor=pointer]:
+      - /url: ../index.html
+    - link "程式碼對照" [ref=f8e9] [cursor=pointer]:
+      - /url: index.html
+    - link "實作案例" [ref=f8e10] [cursor=pointer]:
+      - /url: ../worked.html
+    - link "關於" [ref=f8e11] [cursor=pointer]:
+      - /url: ../../about.html
+  - link "← 程式碼對照" [ref=f8e13] [cursor=pointer]:
+    - /url: index.html
+  - banner [ref=f8e14]:
+    - heading "主線 pipeline：detect → extract → build → cluster" [level=1] [ref=f8e15]
+    - generic [ref=f8e16]: 資料流主幹逐函數講解
+    - generic [ref=f8e17]:
+      - text: 檔案：
+      - code [ref=f8e18]: detect.py
+      - text: （1996 行）·
+      - code [ref=f8e19]: extract.py
+      - text: （5993 行）·
+      - code [ref=f8e20]: build.py
+      - text: （1943 行）·
+      - code [ref=f8e21]: cluster.py
+      - text: （320 行）
+  - generic [ref=f8e22]:
+    - heading "大方向" [level=2] [ref=f8e23]
+    - paragraph [ref=f8e24]:
+      - text: 這四支模組就是「把檔案變成圖」的資料流：
+      - code [ref=f8e25]: detect
+      - text: 找出有哪些檔案 →
+      - code [ref=f8e26]: extract
+      - text: 把每個檔案抽成
+      - code [ref=f8e27]: "{nodes, edges}"
+      - text: →
+      - code [ref=f8e28]: build
+      - text: 併成一張 NetworkX 圖 →
+      - code [ref=f8e29]: cluster
+      - text: 用 Leiden 把節點分成社群。每一步的介面都很乾淨：dict 進、dict 出，只在
+      - code [ref=f8e30]: graphify-out/
+      - text: 寫檔。
+    - separator [ref=f8e31]
+    - heading "1. detect.py — 收集與分類檔案" [level=2] [ref=f8e32]
+    - group [ref=f8e33]:
+      - generic "classify_file(path) Path → FileType | None detect.py:491 決定一個檔案的「類型」：程式碼、文件、論文、圖片、影片，或無法定義。" [ref=f8e34] [cursor=pointer]:
+        - generic [ref=f8e35]: classify_file(path)
+        - generic [ref=f8e36]: Path → FileType | None
+        - generic [ref=f8e37]: detect.py:491
+        - generic [ref=f8e38]: 決定一個檔案的「類型」：程式碼、文件、論文、圖片、影片，或無法定義。
+      - generic [ref=f8e39]:
+        - generic [ref=f8e40]:
+          - paragraph [ref=f8e41]:
+            - text: 這是整個管線的「分類開關」。它依序檢查、
+            - strong [ref=f8e42]: 先比對特殊情況、再比對副檔名
+            - text: ：
+          - list [ref=f8e43]:
+            - listitem [ref=f8e44]:
+              - strong [ref=f8e45]: 套件 manifest 優先
+              - text: ：
+              - code [ref=f8e46]: pyproject.toml
+              - text: 、
+              - code [ref=f8e47]: go.mod
+              - text: 、
+              - code [ref=f8e48]: pom.xml
+              - text: 等被導向
+              - code [ref=f8e49]: CODE
+              - text: （用確定性的 manifest 解析，而不是丟給 LLM）——否則一個
+              - code [ref=f8e50]: apm.yml
+              - text: 會被當成「文件」送 LLM，把套件拆成重複節點。
+            - listitem [ref=f8e51]:
+              - strong [ref=f8e52]: 複合副檔名先查
+              - text: ：
+              - code [ref=f8e53]: .blade.php
+              - text: 要在查
+              - code [ref=f8e54]: .php
+              - text: 之前判斷。
+            - listitem [ref=f8e55]:
+              - text: 接著依序查
+              - code [ref=f8e56]: CODE_EXTENSIONS
+              - text: 、
+              - code [ref=f8e57]: PAPER_EXTENSIONS
+              - text: （PDF 在 Xcode asset catalog 裡是向量圖示，要排除）、
+              - code [ref=f8e58]: IMAGE_EXTENSIONS
+              - text: 、
+              - code [ref=f8e59]: DOC_EXTENSIONS
+              - text: （再檢查是否長得像論文）、office、Google Workspace、video。
+            - listitem [ref=f8e60]:
+              - text: 無副檔名時退回
+              - code [ref=f8e61]: _shebang_file_type()
+              - text: （
+              - code [ref=f8e62]: "#!/usr/bin/env bash"
+              - text: 的 CLI 也是程式碼）。
+          - paragraph [ref=f8e63]: 這就是「程式碼零 LLM、文件要 LLM」的源頭——類型決定後，走哪條抽取路徑就定了。
+        - generic [ref=f8e64]:
+          - generic [ref=f8e65]:
+            - generic [ref=f8e66]: "491"
+            - generic [ref=f8e67]: "def classify_file(path: Path) -> FileType | None:"
+          - generic [ref=f8e68]:
+            - generic [ref=f8e69]: "496"
+            - generic [ref=f8e70]: from graphify.manifest_ingest import is_package_manifest_path
+          - generic [ref=f8e71]:
+            - generic [ref=f8e72]: "497"
+            - generic [ref=f8e73]: "if is_package_manifest_path(path):"
+          - generic [ref=f8e74]:
+            - generic [ref=f8e75]: "498"
+            - generic [ref=f8e76]: "return FileType.CODE # 套件 manifest 走確定性解析"
+          - generic [ref=f8e77]:
+            - generic [ref=f8e78]: "500"
+            - generic [ref=f8e79]: "if path.name.lower().endswith(\".blade.php\"):"
+          - generic [ref=f8e80]:
+            - generic [ref=f8e81]: "501"
+            - generic [ref=f8e82]: "return FileType.CODE # 複合副檔名先比"
+          - generic [ref=f8e83]:
+            - generic [ref=f8e84]: "505"
+            - generic [ref=f8e85]: "if ext in CODE_EXTENSIONS: return FileType.CODE"
+          - generic [ref=f8e86]:
+            - generic [ref=f8e87]: "512"
+            - generic [ref=f8e88]: "if ext in IMAGE_EXTENSIONS: return FileType.IMAGE"
+          - generic [ref=f8e89]:
+            - generic [ref=f8e90]: "523"
+            - generic [ref=f8e91]: "if ext in VIDEO_EXTENSIONS: return FileType.VIDEO"
+          - generic [ref=f8e92]:
+            - generic [ref=f8e93]: "525"
+            - generic [ref=f8e94]: "return None # 無副檔名 → 靠 shebang 判斷"
+    - group [ref=f8e95]:
+      - generic "detect(root, *, follow_symlinks, …) Path → dict detect.py:1288 掃描整棵目錄樹，回傳分類好的檔案清單與語料統計。" [ref=f8e96] [cursor=pointer]:
+        - generic [ref=f8e97]: detect(root, *, follow_symlinks, …)
+        - generic [ref=f8e98]: Path → dict
+        - generic [ref=f8e99]: detect.py:1288
+        - generic [ref=f8e100]: 掃描整棵目錄樹，回傳分類好的檔案清單與語料統計。
+    - group [ref=f8e101]:
+      - generic "_is_noise_dir · _is_sensitive · _is_ignored 系列 detect.py 各處 過濾的三大支柱：雜訊目錄、敏感檔、ignore 規則。" [ref=f8e102] [cursor=pointer]:
+        - generic [ref=f8e103]: _is_noise_dir · _is_sensitive · _is_ignored 系列
+        - generic [ref=f8e104]: detect.py 各處
+        - generic [ref=f8e105]: 過濾的三大支柱：雜訊目錄、敏感檔、ignore 規則。
+    - separator [ref=f8e106]
+    - heading "2. extract.py — 把檔案抽成圖的片段" [level=2] [ref=f8e107]
+    - group [ref=f8e108]:
+      - generic "extract(paths, *, root, parallel, …) list[Path] → dict extract.py:4688 兩遍處理：逐檔 AST 抽取 → 跨檔 import 解析（產生 INFERRED 邊）。" [ref=f8e109] [cursor=pointer]:
+        - generic [ref=f8e110]: extract(paths, *, root, parallel, …)
+        - generic [ref=f8e111]: list[Path] → dict
+        - generic [ref=f8e112]: extract.py:4688
+        - generic [ref=f8e113]: 兩遍處理：逐檔 AST 抽取 → 跨檔 import 解析（產生 INFERRED 邊）。
+      - generic [ref=f8e114]:
+        - generic [ref=f8e115]:
+          - paragraph [ref=f8e116]: 這是程式碼抽取的入口。docstring 講得很清楚，兩遍：
+          - list [ref=f8e117]:
+            - listitem [ref=f8e118]:
+              - strong [ref=f8e119]: Phase 1 — 逐檔結構抽取
+              - text: ：每個程式碼檔用 tree-sitter 解析，抽出類別、函數、import。
+            - listitem [ref=f8e120]:
+              - strong [ref=f8e121]: Phase 2 — 跨檔解析
+              - text: ：把「檔案級 import」變成「類別級 INFERRED 邊」——例如
+              - code [ref=f8e122]: DigestAuth --uses--> Response
+              - text: 。
+          - paragraph [ref=f8e123]:
+            - text: 實作上最關鍵的是「
+            - strong [ref=f8e124]: 快取與平行化
+            - text: 」：
+          - list [ref=f8e125]:
+            - listitem [ref=f8e126]:
+              - text: 先依
+              - code [ref=f8e127]: _get_extractor(path)
+              - text: 找出每個檔的抽取器；沒有抽取器的檔直接給空結果。
+            - listitem [ref=f8e128]:
+              - text: 非 bypass 快取的檔先查 SHA256 內容快取（
+              - code [ref=f8e129]: load_cached
+              - text: ），命中就直接用。
+            - listitem [ref=f8e130]:
+              - text: 剩下的
+              - code [ref=f8e131]: uncached_work
+              - text: 若超過平行門檻（
+              - code [ref=f8e132]: _PARALLEL_THRESHOLD
+              - text: ）就用
+              - code [ref=f8e133]: ProcessPoolExecutor
+              - text: 平行抽取（
+              - code [ref=f8e134]: _extract_parallel
+              - text: ，繞過 GIL）；池中途壞掉時，
+              - code [ref=f8e135]: _extract_sequential
+              - text: "只重抽沒完成的（issue #2444）。"
+            - listitem [ref=f8e136]:
+              - text: 抽取結果後段有一大串「
+              - strong [ref=f8e137]: 醒目標記
+              - text: 」：零節點檔（#1666）、無抽取器但歸類為 code 的副檔名（#1689）、缺相依套件的副檔名（#1745）——每一種都印出清楚警告，並附上解決提示（例如
+              - code [ref=f8e138]: pip install "graphifyy[sql]"
+              - text: ）。
+          - generic [ref=f8e139]:
+            - strong [ref=f8e140]: 閱讀提示
+            - text: ：這 5993 行的檔案裡，最值得看的是 4688 的
+            - code [ref=f8e141]: extract()
+            - text: 主流程、後段的 ID 正規化/重映射（為了跨機器與 AST↔semantic 一致），以及語言的
+            - code [ref=f8e142]: _import_*
+            - text: 家族。這裡只帶你看主流程；語言的通用抽取邏輯在
+            - link "extractors" [ref=f8e143] [cursor=pointer]:
+              - /url: extractors.html
+            - text: 頁。
+        - generic [ref=f8e144]:
+          - generic [ref=f8e145]:
+            - generic [ref=f8e146]: "4700"
+            - generic [ref=f8e147]: "Two-pass process:"
+          - generic [ref=f8e148]:
+            - generic [ref=f8e149]: "4701"
+            - generic [ref=f8e150]: 1. Per-file structural extraction (classes, functions, imports)
+          - generic [ref=f8e151]:
+            - generic [ref=f8e152]: "4702"
+            - generic [ref=f8e153]: "2. Cross-file import resolution: file imports -> class-level INFERRED edges"
+          - generic [ref=f8e154]:
+            - generic [ref=f8e155]: "4786"
+            - generic [ref=f8e156]: "for i, path in enumerate(paths):"
+          - generic [ref=f8e157]:
+            - generic [ref=f8e158]: "4787"
+            - generic [ref=f8e159]: "if _get_extractor(path) is None: # 無抽取器 → 空結果"
+          - generic [ref=f8e160]:
+            - generic [ref=f8e161]: "4790"
+            - generic [ref=f8e162]: bypass_cache = path.suffix in _JS_CACHE_BYPASS_SUFFIXES
+          - generic [ref=f8e163]:
+            - generic [ref=f8e164]: "4792"
+            - generic [ref=f8e165]: "cached = load_cached(path, root, …) # SHA256 內容快取"
+          - generic [ref=f8e166]:
+            - generic [ref=f8e167]: "4796"
+            - generic [ref=f8e168]: uncached_work.append((i, path))
+          - generic [ref=f8e169]:
+            - generic [ref=f8e170]: "4801"
+            - generic [ref=f8e171]: "if parallel and len(uncached_work) >= _PARALLEL_THRESHOLD:"
+          - generic [ref=f8e172]:
+            - generic [ref=f8e173]: "4802"
+            - generic [ref=f8e174]: "ran_parallel = _extract_parallel(…) # 平行多處理"
+          - generic [ref=f8e175]:
+            - generic [ref=f8e176]: "4898"
+            - generic [ref=f8e177]: "all_nodes, all_edges, all_raw_calls = [], [], [] # 合併所有結果"
+        - generic [ref=f8e178]:
+          - strong [ref=f8e179]: 設計重點
+          - text: ：
+          - code [ref=f8e180]: extract()
+          - text: 對「失敗」極度敏感——零節點、無抽取器、缺相依，每一種都明確印出警告。理由是：
+          - emphasis [ref=f8e181]: 一個檔默默消失
+          - text: 是最難除錯的資料問題。
+    - group [ref=f8e182]:
+      - generic "_get_extractor(path) Path → Any | None extract.py:4413 依副檔名/檔名/shebang 選出對的抽取器。" [ref=f8e183] [cursor=pointer]:
+        - generic [ref=f8e184]: _get_extractor(path)
+        - generic [ref=f8e185]: Path → Any | None
+        - generic [ref=f8e186]: extract.py:4413
+        - generic [ref=f8e187]: 依副檔名/檔名/shebang 選出對的抽取器。
+    - group [ref=f8e188]:
+      - generic "extract_python(path) Path → dict extract.py:1190 Python 抽取的入口——通用抽取 + rationale（docstring）抽取。" [ref=f8e189] [cursor=pointer]:
+        - generic [ref=f8e190]: extract_python(path)
+        - generic [ref=f8e191]: Path → dict
+        - generic [ref=f8e192]: extract.py:1190
+        - generic [ref=f8e193]: Python 抽取的入口——通用抽取 + rationale（docstring）抽取。
+    - group [ref=f8e194]:
+      - 'generic "_file_node_id(rel_path) Path → str extract.py:177 檔案節點 ID 的規範形式：{parent_dir}_{stem}。" [ref=f8e195] [cursor=pointer]':
+        - generic [ref=f8e196]: _file_node_id(rel_path)
+        - generic [ref=f8e197]: Path → str
+        - generic [ref=f8e198]: extract.py:177
+        - generic [ref=f8e199]: "檔案節點 ID 的規範形式：{parent_dir}_{stem}。"
+    - group [ref=f8e200]:
+      - generic "_import_* 家族與 rationale 抽取 extract.py 各處 各語言的 import 處理與「為什麼」節點。" [ref=f8e201] [cursor=pointer]:
+        - generic [ref=f8e202]: _import_* 家族與 rationale 抽取
+        - generic [ref=f8e203]: extract.py 各處
+        - generic [ref=f8e204]: 各語言的 import 處理與「為什麼」節點。
+    - separator [ref=f8e205]
+    - heading "3. build.py — 併成 NetworkX 圖" [level=2] [ref=f8e206]
+    - group [ref=f8e207]:
+      - generic "build(extractions, *, directed, dedup, …) list[dict] → nx.Graph build.py:1264 把多份抽取結果合併成單一圖；預設先做實體去重。" [ref=f8e208] [cursor=pointer]:
+        - generic [ref=f8e209]: build(extractions, *, directed, dedup, …)
+        - generic [ref=f8e210]: list[dict] → nx.Graph
+        - generic [ref=f8e211]: build.py:1264
+        - generic [ref=f8e212]: 把多份抽取結果合併成單一圖；預設先做實體去重。
+      - generic [ref=f8e213]:
+        - generic [ref=f8e214]:
+          - paragraph [ref=f8e215]: 這是「進料 → 一張圖」的合併點：
+          - list [ref=f8e216]:
+            - listitem [ref=f8e217]:
+              - text: 把每份 extraction 的
+              - code [ref=f8e218]: nodes
+              - text: 、
+              - code [ref=f8e219]: edges
+              - text: 、
+              - code [ref=f8e220]: hyperedges
+              - text: 、token 統計全部併進一個
+              - code [ref=f8e221]: combined
+              - text: dict。
+            - listitem [ref=f8e222]:
+              - text: 預設
+              - code [ref=f8e223]: dedup=True
+              - text: ：先做型別強制（
+              - code [ref=f8e224]: _coerce_non_string_ids
+              - text: ）與欄位別名整併（
+              - code [ref=f8e225]: _fold_node_aliases
+              - text: ），再呼叫
+              - code [ref=f8e226]: deduplicate_entities()
+              - text: （見
+              - link "ops · dedup" [ref=f8e227] [cursor=pointer]:
+                - /url: ops.html
+              - text: ），處理同實體不同 label 的問題。
+            - listitem [ref=f8e228]:
+              - text: 最後交給
+              - code [ref=f8e229]: build_from_json()
+              - text: 真正組圖。
+          - generic [ref=f8e230]:
+            - strong [ref=f8e231]: 介面哲學
+            - text: ：
+            - code [ref=f8e232]: build()
+            - text: 只管「合併 + 可選去重」，真正組圖的 dirty work 在
+            - code [ref=f8e233]: build_from_json
+            - text: ——這讓測試可以分層：測合併邏輯 vs 測組圖邏輯。
+        - generic [ref=f8e234]:
+          - generic [ref=f8e235]:
+            - generic [ref=f8e236]: "1288"
+            - generic [ref=f8e237]: "combined: dict = {\"nodes\": [], \"edges\": [], \"hyperedges\": [],"
+          - generic [ref=f8e238]:
+            - generic [ref=f8e239]: "1289"
+            - generic [ref=f8e240]: "\"input_tokens\": 0, \"output_tokens\": 0}"
+          - generic [ref=f8e241]:
+            - generic [ref=f8e242]: "1295"
+            - generic [ref=f8e243]: "if dedup and combined[\"nodes\"]:"
+          - generic [ref=f8e244]:
+            - generic [ref=f8e245]: "1307"
+            - generic [ref=f8e246]: combined["nodes"], combined["edges"] = deduplicate_entities(…)
+          - generic [ref=f8e247]:
+            - generic [ref=f8e248]: "1311"
+            - generic [ref=f8e249]: return build_from_json(combined, directed=directed, root=root)
+    - group [ref=f8e250]:
+      - generic "deduplicate_by_label(nodes, edges) → (nodes, edges) build.py:1322 依正規化 label 併節點——但這是「dormant」程式碼。" [ref=f8e251] [cursor=pointer]:
+        - generic [ref=f8e252]: deduplicate_by_label(nodes, edges)
+        - generic [ref=f8e253]: → (nodes, edges)
+        - generic [ref=f8e254]: build.py:1322
+        - generic [ref=f8e255]:
+          - text: 依正規化 label 併節點——
+          - strong [ref=f8e256]: 但這是「dormant」程式碼
+          - text: 。
+    - group [ref=f8e257]:
+      - generic "build_from_json(extraction, *, directed, root) dict → nx.Graph build.py:741 真正把 nodes/edges/hyperedges 組進 NetworkX 圖，含大量 ID 正規化與防護。" [ref=f8e258] [cursor=pointer]:
+        - generic [ref=f8e259]: build_from_json(extraction, *, directed, root)
+        - generic [ref=f8e260]: dict → nx.Graph
+        - generic [ref=f8e261]: build.py:741
+        - generic [ref=f8e262]: 真正把 nodes/edges/hyperedges 組進 NetworkX 圖，含大量 ID 正規化與防護。
+    - group [ref=f8e263]:
+      - generic "build_merge / merge_raw_extraction build.py:1547 / 1426 增量更新的合併路徑——把新抽取併入既有圖、剪除已刪檔。" [ref=f8e264] [cursor=pointer]:
+        - generic [ref=f8e265]: build_merge / merge_raw_extraction
+        - generic [ref=f8e266]: build.py:1547 / 1426
+        - generic [ref=f8e267]: 增量更新的合併路徑——把新抽取併入既有圖、剪除已刪檔。
+    - separator [ref=f8e268]
+    - heading "4. cluster.py — 社群偵測（小而精，320 行全文）" [level=2] [ref=f8e269]
+    - group [ref=f8e270]:
+      - 'generic "_partition(G, resolution) nx.Graph → {node: cid} cluster.py:22 先試 Leiden（graspologic），缺套件就退回 Louvain（networkx）。" [ref=f8e271] [cursor=pointer]':
+        - generic [ref=f8e272]: _partition(G, resolution)
+        - generic [ref=f8e273]: "nx.Graph → {node: cid}"
+        - generic [ref=f8e274]: cluster.py:22
+        - generic [ref=f8e275]: 先試 Leiden（graspologic），缺套件就退回 Louvain（networkx）。
+      - generic [ref=f8e276]:
+        - generic [ref=f8e277]:
+          - paragraph [ref=f8e278]: 「最佳品質優先、退化優雅」的代表作：
+          - list [ref=f8e279]:
+            - listitem [ref=f8e280]:
+              - text: 先把節點/邊
+              - strong [ref=f8e281]: 排序後重組
+              - text: 成
+              - code [ref=f8e282]: stable
+              - text: 圖——讓分群輸入確定性（同樣的圖一定同樣的輸入順序）。
+            - listitem [ref=f8e283]:
+              - text: 試
+              - code [ref=f8e284]: from graspologic.partition import leiden
+              - text: ，透過
+              - code [ref=f8e285]: inspect.signature
+              - text: 動態傳
+              - code [ref=f8e286]: random_seed=42
+              - text: 、
+              - code [ref=f8e287]: trials=1
+              - text: 、
+              - code [ref=f8e288]: resolution
+              - text: （相容不同版本的 graspologic）。
+            - listitem [ref=f8e289]:
+              - text: 呼叫期間把
+              - code [ref=f8e290]: stdout/stderr
+              - text: "導到 devnull——graspologic 會印 ANSI 進度條，在 Windows PowerShell 5.1 會毀掉 scroll buffer（issue #19，一個很實用的雷）。"
+            - listitem [ref=f8e291]:
+              - code [ref=f8e292]: ImportError
+              - text: 就退回 networkx 的 Louvain，同樣用
+              - code [ref=f8e293]: inspect.signature
+              - text: 相容版本差異（
+              - code [ref=f8e294]: max_level
+              - text: 只傳給支援的版本）。
+        - generic [ref=f8e295]:
+          - generic [ref=f8e296]:
+            - generic [ref=f8e297]: "47"
+            - generic [ref=f8e298]: "try:"
+          - generic [ref=f8e299]:
+            - generic [ref=f8e300]: "48"
+            - generic [ref=f8e301]: from graspologic.partition import leiden
+          - generic [ref=f8e302]:
+            - generic [ref=f8e303]: "51"
+            - generic [ref=f8e304]: "if \"random_seed\" in lsig: kwargs[\"random_seed\"] = 42"
+          - generic [ref=f8e305]:
+            - generic [ref=f8e306]: "61"
+            - generic [ref=f8e307]: "with _suppress_output(): # 擋 ANSI 逃逸碼"
+          - generic [ref=f8e308]:
+            - generic [ref=f8e309]: "67"
+            - generic [ref=f8e310]: "except ImportError:"
+          - generic [ref=f8e311]:
+            - generic [ref=f8e312]: "76"
+            - generic [ref=f8e313]: "return {node: cid for cid, nodes in enumerate(communities) for node in nodes}"
+    - group [ref=f8e314]:
+      - 'generic "cluster(G, resolution, exclude_hubs_percentile) nx.Graph → {cid: [nodes]} cluster.py:134 完整分群流程：isolate 處理、hub 排除、過大社群拆分、凝聚力再拆分、ID 穩定化。" [ref=f8e315] [cursor=pointer]':
+        - generic [ref=f8e316]: cluster(G, resolution, exclude_hubs_percentile)
+        - generic [ref=f8e317]: "nx.Graph → {cid: [nodes]}"
+        - generic [ref=f8e318]: cluster.py:134
+        - generic [ref=f8e319]: 完整分群流程：isolate 處理、hub 排除、過大社群拆分、凝聚力再拆分、ID 穩定化。
+      - generic [ref=f8e320]:
+        - generic [ref=f8e321]:
+          - paragraph [ref=f8e322]:
+            - text: 這是
+            - code [ref=f8e323]: cluster.py
+            - text: 的主角，把「分群」這件事補齊到實用：
+          - list [ref=f8e324]:
+            - listitem [ref=f8e325]:
+              - strong [ref=f8e326]: 空圖/無邊
+              - text: ：0 節點回空；無邊時每個節點自成一群。
+            - listitem [ref=f8e327]:
+              - strong [ref=f8e328]: 有向轉無向
+              - text: ：Leiden/Louvain 需要無向輸入。
+            - listitem [ref=f8e329]:
+              - strong [ref=f8e330]: hub 排除
+              - text: （
+              - code [ref=f8e331]: exclude_hubs_percentile
+              - text: ）：度數超過百分位的「超集線器」不參與分群（避免把無關子系統拉進同群），之後依鄰居社群多數決重新掛回。
+            - listitem [ref=f8e332]:
+              - strong [ref=f8e333]: isolate
+              - text: ：0 度的節點各自成單節點社群。
+            - listitem [ref=f8e334]:
+              - strong [ref=f8e335]: 過大社群拆分
+              - text: ：> 25% 節點（至少 10 個）的社群，在子圖上再跑一次
+              - code [ref=f8e336]: _partition
+              - text: 拆開。
+            - listitem [ref=f8e337]:
+              - strong [ref=f8e338]: 凝聚力再拆分
+              - text: ：doc-hub 節點（如 CLAUDE.md 連到所有東西）會製造低凝聚力社群——凝聚力 < 0.05 且 ≥ 50 節點的再拆一次。
+            - listitem [ref=f8e339]:
+              - strong [ref=f8e340]: ID 穩定化
+              - text: ：社群依大小降序重新編號，同大小用
+              - code [ref=f8e341]: tuple(sorted(nodes))
+              - text: "當總序 tiebreak——否則每次跑，那些等大小的社群 ID 會亂跳，造成偽「社群 churn」（issue #1090）。"
+          - generic [ref=f8e342]:
+            - strong [ref=f8e343]: 一個很好的「工程課」
+            - text: ：分群演算法（Leiden）本身只是第一步；真正讓它可用的是圍繞它的工程——確定性、isolate、hub、過大/低凝聚力拆分、ID 穩定。演算法 20 行，工程 200 行。
+        - generic [ref=f8e344]:
+          - generic [ref=f8e345]:
+            - generic [ref=f8e346]: "175"
+            - generic [ref=f8e347]: isolates = [n for n in G.nodes() if G.degree(n) == 0 …]
+          - generic [ref=f8e348]:
+            - generic [ref=f8e349]: "186"
+            - generic [ref=f8e350]: "for node in isolates: raw[next_cid] = [node]; next_cid += 1"
+          - generic [ref=f8e351]:
+            - generic [ref=f8e352]: "210"
+            - generic [ref=f8e353]: max_size = max(_MIN_SPLIT_SIZE, int(G.number_of_nodes() * 0.25))
+          - generic [ref=f8e354]:
+            - generic [ref=f8e355]: "222"
+            - generic [ref=f8e356]: "if len(nodes) >= 50 and cohesion_score(G, nodes) < 0.05:"
+          - generic [ref=f8e357]:
+            - generic [ref=f8e358]: "235"
+            - generic [ref=f8e359]: "final_communities.sort(key=lambda n: (-len(n), tuple(sorted(n))))"
+          - generic [ref=f8e360]:
+            - generic [ref=f8e361]: "236"
+            - generic [ref=f8e362]: "return {i: sorted(nodes) for i, nodes in enumerate(final_communities)}"
+    - group [ref=f8e363]:
+      - 'generic "label_communities_by_hub(G, communities) → {cid: label} cluster.py:86 不用 LLM 的社群命名：取社群內度數最高的成員當名字。" [ref=f8e364] [cursor=pointer]':
+        - generic [ref=f8e365]: label_communities_by_hub(G, communities)
+        - generic [ref=f8e366]: "→ {cid: label}"
+        - generic [ref=f8e367]: cluster.py:86
+        - generic [ref=f8e368]: 不用 LLM 的社群命名：取社群內度數最高的成員當名字。
+    - group [ref=f8e369]:
+      - generic "cohesion_score · score_all · community_member_sigs cluster.py 各處 凝聚力計算、全社群評分、成員指紋。" [ref=f8e370] [cursor=pointer]:
+        - generic [ref=f8e371]: cohesion_score · score_all · community_member_sigs
+        - generic [ref=f8e372]: cluster.py 各處
+        - generic [ref=f8e373]: 凝聚力計算、全社群評分、成員指紋。
+    - generic [ref=f8e374]:
+      - strong [ref=f8e375]: 看完這頁你應該能說出
+      - text: ：
+      - code [ref=f8e376]: detect
+      - text: 怎麼決定一個檔案走 AST 還是 LLM；
+      - code [ref=f8e377]: extract
+      - text: 的快取與平行策略；
+      - code [ref=f8e378]: build
+      - text: 的 dedup 在哪一步；
+      - code [ref=f8e379]: cluster
+      - text: 為了確定性做了哪三件事。接著讀
+      - link "analyze + report" [ref=f8e380] [cursor=pointer]:
+        - /url: analysis.html
+      - text: 看「圖建好之後怎麼分析」。
+    - paragraph [ref=f8e381]:
+      - text: 相關：
+      - link "extractors 語言抽取器" [ref=f8e382] [cursor=pointer]:
+        - /url: extractors.html
+      - text: ·
+      - link "增量更新設計" [ref=f8e383] [cursor=pointer]:
+        - /url: ../incremental.html
+      - text: ·
+      - link "概念地圖" [ref=f8e384] [cursor=pointer]:
+        - /url: ../../map.html
+  - contentinfo [ref=f8e385]:
+    - generic [ref=f8e386]:
+      - text: 這是
+      - link "Graphify-Labs/graphify" [ref=f8e387] [cursor=pointer]:
+        - /url: https://github.com/Graphify-Labs/graphify
+      - text: 的非官方繁體中文教學站。
+    - generic [ref=f8e388]:
+      - text: 內容 ©
+      - link "Graphify Labs" [ref=f8e389] [cursor=pointer]:
+        - /url: https://github.com/Graphify-Labs/graphify
+      - text: （Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a

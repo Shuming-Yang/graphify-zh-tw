@@ -1,0 +1,130 @@
+- generic [ref=f6e2]:
+  - navigation [ref=f6e3]:
+    - link "首頁" [ref=f6e4] [cursor=pointer]:
+      - /url: index.html
+    - link "概念地圖" [ref=f6e5] [cursor=pointer]:
+      - /url: map.html
+    - link "學習路線" [ref=f6e6] [cursor=pointer]:
+      - /url: learning-path.html
+    - link "安裝指南" [ref=f6e7] [cursor=pointer]:
+      - /url: install.html
+    - link "文件教學" [ref=f6e8] [cursor=pointer]:
+      - /url: docs/index.html
+    - link "程式碼對照" [ref=f6e9] [cursor=pointer]:
+      - /url: docs/code/index.html
+    - link "實作案例" [ref=f6e10] [cursor=pointer]:
+      - /url: docs/worked.html
+    - link "關於" [ref=f6e11] [cursor=pointer]:
+      - /url: about.html
+  - banner [ref=f6e12]:
+    - heading "Graphify 繁體中文教學站" [level=1] [ref=f6e13]
+    - generic [ref=f6e14]: 把整個 repo（程式碼 · 文件 · 技能 · 測試 · 案例）做成中英對照的解說
+    - generic [ref=f6e15]:
+      - strong [ref=f6e16]: Graphify
+      - text: 是一個開源工具：在你的 AI 程式碼助手中輸入
+      - code [ref=f6e17]: /graphify
+      - text: ， 它會用 tree-sitter 在本機把整個專案（程式碼、文件、PDF、圖片）解析成一張
+      - strong [ref=f6e18]: 可查詢的知識圖譜
+      - text: ——用「問問題、找路徑、解釋節點」取代「一個檔案一個檔案地 grep」。
+  - generic [ref=f6e19]:
+    - link "🕸️ 概念地圖 Concept Map 節點、邊、社群、god-node、EXTRACTED vs INFERRED——一張圖看懂知識圖譜的所有核心概念，以及 graphify 的運作流程。" [ref=f6e20] [cursor=pointer]:
+      - /url: map.html
+      - generic [ref=f6e21]: 🕸️
+      - generic [ref=f6e22]: 概念地圖
+      - generic [ref=f6e23]: Concept Map
+      - generic [ref=f6e24]: 節點、邊、社群、god-node、EXTRACTED vs INFERRED——一張圖看懂知識圖譜的所有核心概念，以及 graphify 的運作流程。
+    - link "🧗 學習路線 Learning Path 從安裝到讀源碼的分層路線：L0 裝好、L1 跑起來、L2 讀圖、L3 讀原理、L4 讀源碼。" [ref=f6e25] [cursor=pointer]:
+      - /url: learning-path.html
+      - generic [ref=f6e26]: 🧗
+      - generic [ref=f6e27]: 學習路線
+      - generic [ref=f6e28]: Learning Path
+      - generic [ref=f6e29]: 從安裝到讀源碼的分層路線：L0 裝好、L1 跑起來、L2 讀圖、L3 讀原理、L4 讀源碼。
+    - link "📦 安裝指南 Install Guide OpenCode / Claude Code / Cursor 等 17 個平台的安裝指令、延伸套件與疑難排解。" [ref=f6e30] [cursor=pointer]:
+      - /url: install.html
+      - generic [ref=f6e31]: 📦
+      - generic [ref=f6e32]: 安裝指南
+      - generic [ref=f6e33]: Install Guide
+      - generic [ref=f6e34]: OpenCode / Claude Code / Cursor 等 17 個平台的安裝指令、延伸套件與疑難排解。
+    - link "📚 文件教學 Documentation 翻譯並解說官方文件：運作原理、架構、基準測試、安全模型、RFC、技能檔結構。" [ref=f6e35] [cursor=pointer]:
+      - /url: docs/index.html
+      - generic [ref=f6e36]: 📚
+      - generic [ref=f6e37]: 文件教學
+      - generic [ref=f6e38]: Documentation
+      - generic [ref=f6e39]: 翻譯並解說官方文件：運作原理、架構、基準測試、安全模型、RFC、技能檔結構。
+    - link "🧩 程式碼對照 Code Walkthrough /graphify 主程式、/tools、/scripts、/tests 逐函數講解，每個函數一個收縮塊，中文解說配英文原始碼。" [ref=f6e40] [cursor=pointer]:
+      - /url: docs/code/index.html
+      - generic [ref=f6e41]: 🧩
+      - generic [ref=f6e42]: 程式碼對照
+      - generic [ref=f6e43]: Code Walkthrough
+      - generic [ref=f6e44]: /graphify 主程式、/tools、/scripts、/tests 逐函數講解，每個函數一個收縮塊，中文解說配英文原始碼。
+    - link "🎮 Worked Examples 實作案例 /worked 五個真實案例的產出展示，外加可實際操作的雙版本互動知識圖譜（英文 / 中文界面）。" [ref=f6e45] [cursor=pointer]:
+      - /url: docs/worked.html
+      - generic [ref=f6e46]: 🎮
+      - generic [ref=f6e47]: Worked Examples
+      - generic [ref=f6e48]: 實作案例
+      - generic [ref=f6e49]: /worked 五個真實案例的產出展示，外加可實際操作的雙版本互動知識圖譜（英文 / 中文界面）。
+  - generic [ref=f6e50]:
+    - heading "上游同步 · 版本釘選" [level=2] [ref=f6e51]
+    - generic [ref=f6e52]:
+      - text: 對齊上游
+      - code [ref=f6e53]: Graphify-Labs/graphify
+      - text: 分支
+      - code [ref=f6e54]: v8
+      - text: （
+      - code [ref=f6e55]: 9f25a3a
+      - text: ）
+      - generic [ref=f6e56]: 已釘選
+    - paragraph [ref=f6e57]: 上游為 Apache-2.0 授權，本站內容逐月檢查並更新對齊版本。
+  - generic [ref=f6e58]:
+    - generic [ref=f6e59]:
+      - generic [ref=f6e60]: 專案資料
+      - generic [ref=f6e61]: 來源：Graphify-Labs/graphify（Apache-2.0）
+    - list [ref=f6e63]:
+      - listitem [ref=f6e64]:
+        - strong [ref=f6e65]: 官方 repo
+        - text: ：
+        - link "github.com/Graphify-Labs/graphify" [ref=f6e66] [cursor=pointer]:
+          - /url: https://github.com/Graphify-Labs/graphify
+        - text: （分支 v8，授權 Apache-2.0）
+      - listitem [ref=f6e67]:
+        - strong [ref=f6e68]: PyPI 套件
+        - text: ：
+        - code [ref=f6e69]: graphifyy
+        - text: （雙 y）→ CLI 指令為
+        - code [ref=f6e70]: graphify
+      - listitem [ref=f6e71]:
+        - strong [ref=f6e72]: 官方網站
+        - text: ：
+        - link "graphify.com" [ref=f6e73] [cursor=pointer]:
+          - /url: https://graphify.com
+        - text: （Graphify Labs，YC S26）
+      - listitem [ref=f6e74]:
+        - strong [ref=f6e75]: 支援平台
+        - text: ：Claude Code、OpenCode、Cursor、Codex、Gemini CLI、GitHub Copilot CLI 等 20+
+      - listitem [ref=f6e76]:
+        - strong [ref=f6e77]: 核心賣點
+        - text: ：程式碼在本機解析（tree-sitter AST，零 LLM、零 token），社群偵測用 Leiden 演算法，每次查詢比讀原始檔省
+        - strong [ref=f6e78]: 71.5 倍
+        - text: token
+  - contentinfo [ref=f6e79]:
+    - generic [ref=f6e80]:
+      - text: 這是
+      - link "Graphify-Labs/graphify" [ref=f6e81] [cursor=pointer]:
+        - /url: https://github.com/Graphify-Labs/graphify
+      - text: 的非官方繁體中文教學站——中文解說為本站撰寫，英文原文與程式碼保留上游原貌。
+    - generic [ref=f6e82]:
+      - text: 內容 ©
+      - link "Graphify Labs" [ref=f6e83] [cursor=pointer]:
+        - /url: https://github.com/Graphify-Labs/graphify
+      - text: （Apache-2.0）· 本站與 Graphify Labs 無關，為第三方社群教學站 · 由 OpenCode 建置
+    - generic [ref=f6e84]:
+      - text: 授權檔案：
+      - link "Apache-2.0 LICENSE" [ref=f6e85] [cursor=pointer]:
+        - /url: LICENSE
+      - text: ·
+      - link "LICENSE-MIT" [ref=f6e86] [cursor=pointer]:
+        - /url: LICENSE-MIT
+      - text: ·
+      - link "NOTICE" [ref=f6e87] [cursor=pointer]:
+        - /url: NOTICE
+      - text: 均照抄自上游
