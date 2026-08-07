@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Docker MCP + SQLite · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>Docker MCP Toolkit + SQLite</h1>
+  <div class="subtitle">一個可重現的 runbook：把 SQLite MCP server 裝進 Docker Desktop 的 MCP Toolkit</div>
+  <div class="badge-line">來源：<code>docs/docker-mcp-sqlite.md</code></div>
+</header>
+
+<div class="guide">
+
+<div class="callout warn"><strong>先聲明</strong>：這份文件<strong>不是使用 graphify 的必要條件</strong>——它住在 repo 裡，是一份「已知可用」的食譜，給想在同一個 MCP 環境旁放一個輕量 SQL 工作區的使用者。</div>
+
+<h2>能得到什麼</h2>
+<p>裝完之後，任何連到 Docker MCP gateway 的 MCP 客戶端（Claude Code、Claude Desktop、Cursor、VS Code 等）會多出六個 SQLite 工具：</p>
+<pre><code>read_query · write_query · create_table · list_tables · describe_table · append_insight</code></pre>
+
+<h2>為什麼選 <code>SQLite</code>（而不是 <code>sqlite-mcp-server</code>）</h2>
+<p>目前 catalog 有兩個 SQLite MCP image，但只有一個能動：</p>
+<table>
+<tr><th>Catalog 名</th><th>Image</th><th>狀態</th></tr>
+<tr><td><code>SQLite</code></td><td><code>mcp/sqlite</code></td><td>catalog metadata 標「Archived」，但<strong>能啟動且正確服務</strong></td></tr>
+<tr><td><code>sqlite-mcp-server</code></td><td><code>mcp/sqlite-mcp-server</code></td><td><strong>壞掉</strong>：entrypoint <code>/app/.venv/bin/mcp-server-sqlite</code> 在發布層不存在</td></tr>
+</table>
+<p>用 <code>SQLite</code>（<code>mcp/sqlite</code>）直到上游修好新 image。</p>
+
+<h2>前置需求</h2>
+<ul>
+<li>Docker Desktop 執行中且健康：<code>docker info</code> 回傳 <code>Server Version</code>；public socket 在 <code>/var/run/docker.sock</code>（或連到 <code>~/.docker/run/docker.sock</code>）。</li>
+<li>Docker MCP Toolkit CLI plugin（<code>docker mcp</code>）：新 Docker Desktop 內建；<code>docker mcp --version</code> 應印出版本。</li>
+</ul>
+
+<h2>安裝</h2>
+<pre><code># 把可用的 SQLite server 加進預設 MCP profile
+docker mcp profile server add default \
+  --server catalog://mcp/docker-mcp-catalog/SQLite
+
+# 預先拉 image，讓第一次工具呼叫變快
+docker pull mcp/sqlite:latest</code></pre>
+<p>驗證 profile 現在同時有 <code>fetch</code>（內建）與 <code>SQLite</code>：</p>
+<pre><code>docker mcp profile show default | grep -E '^[[:space:]]+name:'</code></pre>
+<p>預期輸出：<code>name: fetch</code>、<code>name: SQLite</code>。gateway 應多暴露 6 個工具：<code>docker mcp tools count</code> → 15 個（加之前是 9 個）。</p>
+
+<h2>冒煙測試</h2>
+<p>CLI 可以直接呼叫 MCP 工具（每次呼叫開新的 ephemeral gateway，約 5 秒開銷）：</p>
+<pre><code>docker mcp tools call list_tables
+docker mcp tools call create_table \
+  query='CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY AUTOINCREMENT, body TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)'
+docker mcp tools call write_query \
+  query="INSERT INTO notes(body) VALUES ('first row'), ('second row')"
+docker mcp tools call read_query \
+  query='SELECT * FROM notes ORDER BY id'
+docker mcp tools call describe_table table_name=notes
+docker mcp tools call append_insight insight='3 rows inserted; aggregates work.'</code></pre>
+<p><code>read_query</code> 應回傳帶時間戳的插入列。</p>
+
+<h2>儲存布局</h2>
+<p>資料庫檔放在 Docker named volume <code>mcp-sqlite</code>，mount 在容器內 <code>/mcp</code>：</p>
+<pre><code>mcp-sqlite (named volume) → /mcp/db.sqlite</code></pre>
+<p>從 host 檢查：</p>
+<pre><code>docker volume inspect mcp-sqlite
+docker run --rm -v mcp-sqlite:/mcp:ro alpine ls -la /mcp
+docker run --rm -v mcp-sqlite:/mcp:ro keinos/sqlite3 \
+  sqlite3 /mcp/db.sqlite '.schema'</code></pre>
+<p>volume 在 <code>docker run --rm</code> 之間持續存在，所以一個 MCP 工具呼叫寫的資料，下一個呼叫看得到。</p>
+
+<h2>接進 MCP 客戶端</h2>
+<pre><code>docker mcp client connect claude-code
+docker mcp client connect cursor
+docker mcp client connect vscode
+docker mcp client connect claude-desktop
+# 支援：claude-code, claude-desktop, cline, codex, continue, crush, cursor,
+#        gemini, goose, gordon, kiro, lmstudio, opencode, sema4, vscode, zed</code></pre>
+<p>每個客戶端連一次即可；gateway 會暴露 active profile 裡的所有 server。驗證：<code>docker mcp client ls</code>。</p>
+
+<h2>解除安裝 / 重置</h2>
+<pre><code>docker mcp profile server remove default SQLite
+docker volume rm mcp-sqlite          # 不可逆
+docker rmi mcp/sqlite:latest</code></pre>
+
+<h2>疑難排解</h2>
+<ul>
+<li><strong><code>starting client: calling "initialize": EOF</code></strong>：要求的 server MCP handshake 失敗。直接跑 image 看錯誤：用 <code>printf '{"jsonrpc":"2.0",…"initialize"…}' | docker run --rm -i -v mcp-sqlite:/mcp &lt;image-ref&gt; --db-path /mcp/db.sqlite</code>。常見原因：image 缺 entrypoint binary（就是 <code>sqlite-mcp-server</code> 的掛法）或缺 env/secrets。</li>
+<li><strong><code>cannot use --enable-all-servers with --servers flag</code></strong>：這兩個 gateway 參數互斥，選一個。</li>
+<li><strong>裝完 <code>docker mcp tools count</code> 沒看到新工具</strong>：gateway 可能以 <code>dynamic-tools</code> 執行，直到 session 中啟動 profile 才暴露 meta-tools（<code>mcp-add</code>、<code>mcp-find</code>…）。執行 <code>docker mcp tools</code>（會以預設 profile 開 ephemeral gateway）或從 MCP session 內呼叫 <code>mcp-activate-profile</code>。</li>
+</ul>
+
+<div class="callout info"><strong>為什麼這份文件值得教</strong>：它是一份「小而完整的工具 runbook」範本——動機、選型理由（含壞 image 的陷阱）、前置、安裝、驗證、儲存、接線、解除、疑難排解。類似的可重現 step-by-step 寫法，也用在 <a href="worked.html">實作案例</a> 的重現步驟上。</div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

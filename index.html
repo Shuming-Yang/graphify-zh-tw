@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graphify 繁中教學站 · graphify-zh-tw</title>
+<meta name="description" content="Graphify（Apache-2.0）的非官方繁體中文教學站——程式碼對照、文件講解、技能拆解與實作案例。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="index.html">首頁</a>
+  <a href="map.html">概念地圖</a>
+  <a href="learning-path.html">學習路線</a>
+  <a href="install.html">安裝指南</a>
+  <a href="docs/index.html">文件教學</a>
+  <a href="docs/code/index.html">程式碼對照</a>
+  <a href="docs/worked.html">實作案例</a>
+  <a href="about.html">關於</a>
+</nav>
+<header>
+  <h1>Graphify 繁體中文教學站</h1>
+  <div class="subtitle">把整個 repo（程式碼 · 文件 · 技能 · 測試 · 案例）做成中英對照的解說</div>
+  <div class="tagline">
+    <strong>Graphify</strong> 是一個開源工具：在你的 AI 程式碼助手中輸入 <code>/graphify</code>，
+    它會用 tree-sitter 在本機把整個專案（程式碼、文件、PDF、圖片）解析成一張
+    <strong>可查詢的知識圖譜</strong>——用「問問題、找路徑、解釋節點」取代「一個檔案一個檔案地 grep」。
+  </div>
+</header>
+
+<div class="entry-cards">
+  <a class="entry-card" href="map.html">
+    <span class="ec-icon">🕸️</span>
+    <span class="ec-title">概念地圖</span>
+    <span class="ec-en">Concept Map</span>
+    <span class="ec-desc">節點、邊、社群、god-node、EXTRACTED vs INFERRED——一張圖看懂知識圖譜的所有核心概念，以及 graphify 的運作流程。</span>
+  </a>
+  <a class="entry-card" href="learning-path.html">
+    <span class="ec-icon">🧗</span>
+    <span class="ec-title">學習路線</span>
+    <span class="ec-en">Learning Path</span>
+    <span class="ec-desc">從安裝到讀源碼的分層路線：L0 裝好、L1 跑起來、L2 讀圖、L3 讀原理、L4 讀源碼。</span>
+  </a>
+  <a class="entry-card" href="install.html">
+    <span class="ec-icon">📦</span>
+    <span class="ec-title">安裝指南</span>
+    <span class="ec-en">Install Guide</span>
+    <span class="ec-desc">OpenCode / Claude Code / Cursor 等 17 個平台的安裝指令、延伸套件與疑難排解。</span>
+  </a>
+  <a class="entry-card" href="docs/index.html">
+    <span class="ec-icon">📚</span>
+    <span class="ec-title">文件教學</span>
+    <span class="ec-en">Documentation</span>
+    <span class="ec-desc">翻譯並解說官方文件：運作原理、架構、基準測試、安全模型、RFC、技能檔結構。</span>
+  </a>
+  <a class="entry-card" href="docs/code/index.html">
+    <span class="ec-icon">🧩</span>
+    <span class="ec-title">程式碼對照</span>
+    <span class="ec-en">Code Walkthrough</span>
+    <span class="ec-desc">/graphify 主程式、/tools、/scripts、/tests 逐函數講解，每個函數一個收縮塊，中文解說配英文原始碼。</span>
+  </a>
+  <a class="entry-card" href="docs/worked.html">
+    <span class="ec-icon">🎮</span>
+    <span class="ec-en">Worked Examples</span>
+    <span class="ec-title">實作案例</span>
+    <span class="ec-desc">/worked 五個真實案例的產出展示，外加可實際操作的雙版本互動知識圖譜（英文 / 中文界面）。</span>
+  </a>
+</div>
+
+<div class="sync-panel"><h2>上游同步 · 版本釘選</h2><div class="sync-meta">對齊上游 <code>Graphify-Labs/graphify</code> 分支 <code>v8</code>（<code>9f25a3a</code>）<span class="sync-badge ok">已釘選</span></div><p class="sync-empty">上游為 Apache-2.0 授權，本站內容逐月檢查並更新對齊版本。</p></div>
+
+<div class="embed-panel">
+  <div class="embed-head"><span class="embed-title">專案資料</span><span class="repo-status">來源：Graphify-Labs/graphify（Apache-2.0）</span></div>
+  <div class="repo-readme">
+    <ul>
+      <li><strong>官方 repo</strong>：<a href="https://github.com/Graphify-Labs/graphify">github.com/Graphify-Labs/graphify</a>（分支 v8，授權 Apache-2.0）</li>
+      <li><strong>PyPI 套件</strong>：<code>graphifyy</code>（雙 y）→ CLI 指令為 <code>graphify</code></li>
+      <li><strong>官方網站</strong>：<a href="https://graphify.com">graphify.com</a>（Graphify Labs，YC S26）</li>
+      <li><strong>支援平台</strong>：Claude Code、OpenCode、Cursor、Codex、Gemini CLI、GitHub Copilot CLI 等 20+</li>
+      <li><strong>核心賣點</strong>：程式碼在本機解析（tree-sitter AST，零 LLM、零 token），社群偵測用 Leiden 演算法，每次查詢比讀原始檔省 <strong>71.5 倍</strong> token</li>
+    </ul>
+  </div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站——中文解說為本站撰寫，英文原文與程式碼保留上游原貌。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關，為第三方社群教學站 · 由 OpenCode 建置</div>
+  <div class="footer-license">授權檔案：<a href="LICENSE">Apache-2.0 LICENSE</a> · <a href="LICENSE-MIT">LICENSE-MIT</a> · <a href="NOTICE">NOTICE</a> 均照抄自上游</div>
+</footer>
+</div>
+</body>
+</html>

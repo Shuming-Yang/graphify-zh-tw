@@ -1,0 +1,4 @@
+# temp / local
+.DS_Store
+*.local
+graphify-out/

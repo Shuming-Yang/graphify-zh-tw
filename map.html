@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>概念地圖 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="index.html">首頁</a>
+  <a href="map.html">概念地圖</a>
+  <a href="learning-path.html">學習路線</a>
+  <a href="install.html">安裝指南</a>
+  <a href="docs/index.html">文件教學</a>
+  <a href="docs/code/index.html">程式碼對照</a>
+  <a href="docs/worked.html">實作案例</a>
+  <a href="about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 回首頁</a></div>
+<header>
+  <h1>概念地圖</h1>
+  <div class="subtitle">Graphify 知識圖譜的核心概念，一張圖看懂</div>
+</header>
+
+<div class="guide">
+<p>Graphify 做的事可以一句話講完：<strong>把你整個專案變成一張圖</strong>，然後用「問問題」的方式去讀它。下面從「輸入」到「輸出」拆解這張圖長什麼樣。</p>
+
+<h2>1. 輸入：什麼都能進圖</h2>
+<p>不只是程式碼。Graphify 接受程式碼、文件、PDF、圖片、影音，全部進同一張圖：</p>
+<div class="concept-map">
+  <div class="cm-row">
+    <span class="cm-node service"><span class="label">程式碼</span><span class="tag">36 種 tree-sitter 文法 · 本機解析 · 零 LLM</span></span>
+    <span class="cm-node on-ramp"><span class="label">文件</span><span class="tag">.md / .txt / .html · markdown 連結成邊</span></span>
+    <span class="cm-node on-ramp"><span class="label">PDF / 論文</span><span class="tag">需 LLM 語意抽取</span></span>
+    <span class="cm-node on-ramp"><span class="label">圖片 / 影音</span><span class="tag">影片本機轉錄（faster-whisper）</span></span>
+    <span class="cm-node meta"><span class="label">SQL / 資料庫</span><span class="tag">表格、view、外鍵、JOIN 關係</span></span>
+  </div>
+</div>
+
+<h2>2. 流程：七個階段</h2>
+<p>來源：<a href="docs/architecture.html">ARCHITECTURE.md</a>。每個階段是一個獨立模組、一個函數，透過純 dict / NetworkX 圖溝通：</p>
+<div class="concept-map">
+  <div class="cm-row">
+    <span class="cm-node"><span class="label">detect()</span><span class="tag">收集檔案</span><span class="pill">detect.py</span></span>
+    <span class="cm-arrow">→</span>
+    <span class="cm-node"><span class="label">extract()</span><span class="tag">AST 抽取</span><span class="pill">extract.py</span></span>
+    <span class="cm-arrow">→</span>
+    <span class="cm-node"><span class="label">build_graph()</span><span class="tag">組圖</span><span class="pill">build.py</span></span>
+    <span class="cm-arrow">→</span>
+    <span class="cm-node"><span class="label">cluster()</span><span class="tag">社群偵測</span><span class="pill">cluster.py</span></span>
+    <span class="cm-arrow">→</span>
+    <span class="cm-node"><span class="label">analyze()</span><span class="tag">god-node 分析</span><span class="pill">analyze.py</span></span>
+    <span class="cm-arrow">→</span>
+    <span class="cm-node"><span class="label">report()</span><span class="tag">報告</span><span class="pill">report.py</span></span>
+    <span class="cm-arrow">→</span>
+    <span class="cm-node"><span class="label">export()</span><span class="tag">輸出</span><span class="pill">export.py</span></span>
+  </div>
+  <div class="cm-caption">每個階段都只寫進 <code>graphify-out/</code>，沒有共享狀態、沒有副作用</div>
+</div>
+
+<h2>3. 圖的基本元素</h2>
+<p>圖的格式是 NetworkX 的 node-link 結構（<code>graph.json</code>）：</p>
+<div class="concept-map">
+  <div class="cm-row">
+    <span class="cm-node"><span class="label">Node 節點</span><span class="tag">id · label · file_type · source_file</span><span class="pill">code / document / paper / image / rationale</span></span>
+    <span class="cm-node"><span class="label">Edge 邊</span><span class="tag">source → target · relation · confidence</span><span class="pill">calls / imports / uses / references…</span></span>
+    <span class="cm-node meta"><span class="label">Hyperedge 超邊</span><span class="tag">連接 3+ 節點的群組關係</span><span class="pill">G.graph["hyperedges"]</span></span>
+  </div>
+</div>
+
+<h3>邊的信任標籤：EXTRACTED vs INFERRED</h3>
+<p>每一條邊都帶一個標籤，告訴你「這條關係是讀到的還是推出來的」——這是 graphify 最強調的透明性設計：</p>
+<table>
+<tr><th>標籤</th><th>意義</th><th>範例</th></tr>
+<tr><td><code>EXTRACTED</code></td><td>在原始碼中直接找到（confidence 固定 1.0）</td><td>一個 import 語句、一個直接呼叫</td></tr>
+<tr><td><code>INFERRED</code></td><td>合理的推論，帶 <code>confidence_score</code>（0.0–1.0）</td><td>呼叫圖第二遍、跨檔同名解析</td></tr>
+<tr><td><code>AMBIGUOUS</code></td><td>不確定，會在報告中標記人工檢視</td><td>同名符號無法消歧</td></tr>
+</table>
+
+<h3>INFERRED 的離散信賴級距</h3>
+<table>
+<tr><th>分數</th><th>意義</th></tr>
+<tr><td><code>0.95</code></td><td>近乎確定（明確的跨檔引用、單一可行目標）</td></tr>
+<tr><td><code>0.85</code></td><td>強證據（命名 + 上下文吻合）</td></tr>
+<tr><td><code>0.75</code></td><td>合理（有脈絡但不明確）</td></tr>
+<tr><td><code>0.65</code></td><td>弱（僅命名相似）</td></tr>
+<tr><td><code>0.55</code></td><td>臆測</td></tr>
+</table>
+
+<h2>4. 社群偵測：Leiden 演算法</h2>
+<div class="concept-map">
+  <div class="cm-row">
+    <span class="cm-node service"><span class="label">Community 社群</span><span class="tag">Leiden 演算法依邊密度分群 · 不需 embedding</span></span>
+    <span class="cm-node"><span class="label">God node</span><span class="tag">度數最高的節點——「所有東西都流經它」</span></span>
+  </div>
+</div>
+<p>Leiden 是把「彼此之間連線很密的節點」歸成同一群的圖分群方法。Graphify 不需要 embedding 或向量資料庫——Claude 抽出的語意相似邊（<code>semantically_similar_to</code>）本身就已經是圖的一部分，圖的結構就是相似度訊號。</p>
+
+<h2>5. 三個查詢介面</h2>
+<p>圖建好之後，取代「讀原始檔」的就是這三件事：</p>
+<div class="concept-map">
+  <div class="cm-row">
+    <span class="cm-node"><span class="label">graphify query "…"</span><span class="tag">用自然語言問問題，回傳局部子圖</span></span>
+    <span class="cm-node"><span class="label">graphify path A B</span><span class="tag">追蹤兩件事之間的最短路徑</span></span>
+    <span class="cm-node"><span class="label">graphify explain X</span><span class="tag">解釋一個節點與它的鄰居</span></span>
+  </div>
+</div>
+<p>實際輸出的長相（README 的範例）：</p>
+<pre><code>$ graphify explain "APIRouter"
+Node: APIRouter
+  Source:    routing.py L2210
+  Community: 2
+  Degree:    47
+
+Connections (47):
+  --> RequestValidationError [uses] [INFERRED]
+  --> Dependant [uses] [INFERRED]
+  --> .get() [method] [EXTRACTED]
+  <-- __init__.py [imports] [EXTRACTED]
+
+$ graphify path "FastAPI" "ModelField"
+Shortest path (3 hops):
+  FastAPI --uses--> DefaultPlaceholder <--references-- get_request_handler() --references--> ModelField</code></pre>
+
+<h2>6. 產出檔案</h2>
+<div class="concept-map">
+  <div class="cm-row">
+    <span class="cm-node"><span class="label">graph.json</span><span class="tag">完整圖資料（NetworkX node-link）</span></span>
+    <span class="cm-node"><span class="label">GRAPH_REPORT.md</span><span class="tag">god nodes、surprising connections、建議問題</span></span>
+    <span class="cm-node"><span class="label">graph.html</span><span class="tag">可互動的力導向圖（可在瀏覽器點擊）</span></span>
+    <span class="cm-node meta"><span class="label">cache/</span><span class="tag">SHA256 內容快取，重跑只處理變更</span></span>
+  </div>
+</div>
+<p>所有產出都放在 <code>graphify-out/</code>，可 commit 進 git 讓整個團隊共享——每個人都直接讀圖，不用重新建。</p>
+
+<div class="callout info"><strong>小結</strong>：輸入任何東西 → 本機 AST 抽取（免費、確定性）→ 可選的 LLM 語意抽取 → 組圖 → Leiden 分群 → 分析 → 報告 + 互動圖。查詢時讀壓縮過的圖，而不是掃原始檔——這就是省 token 的來源。</div>
+
+<p class="hint">延伸閱讀：<a href="docs/how-it-works.html">運作原理詳解</a> · <a href="docs/architecture.html">架構總覽</a> · <a href="docs/benchmarks.html">效能基準</a></p>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

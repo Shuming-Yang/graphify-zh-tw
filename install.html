@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>安裝指南 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="index.html">首頁</a>
+  <a href="map.html">概念地圖</a>
+  <a href="learning-path.html">學習路線</a>
+  <a href="install.html">安裝指南</a>
+  <a href="docs/index.html">文件教學</a>
+  <a href="docs/code/index.html">程式碼對照</a>
+  <a href="docs/worked.html">實作案例</a>
+  <a href="about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 回首頁</a></div>
+<header>
+  <h1>安裝指南</h1>
+  <div class="subtitle">讓 Graphify 在你用的 AI 助手上跑起來</div>
+</header>
+
+<div class="guide">
+<div class="callout warn"><strong>先記住這件事</strong>：PyPI 套件名是 <code>graphifyy</code>（雙 y），CLI 指令是 <code>graphify</code>。PyPI 上其他 <code>graphify*</code> 套件都不是官方的。</div>
+
+<h2>Step 1 — 安裝套件</h2>
+<pre><code># 推薦（隔離環境；若之後找不到 graphify 指令，跑 uv tool update-shell）
+uv tool install graphifyy
+
+# 替代方案
+pipx install graphifyy
+pip install graphifyy   # 可能需要設定 PATH</code></pre>
+<p class="hint"><strong>為什麼推薦 uv/pipx 而不是 pip？</strong> skill 會在執行期從 <code>graphify-out/.graphify_python</code> 解析 Python 執行環境；如果那指向的環境跟你 pip 安裝套件的環境不同，會報 <code>ModuleNotFoundError: No module named 'graphify'</code>。uv/pipx 把套件隔離在自己的環境裡，完全避開這個問題。</p>
+
+<h2>Step 2 — 註冊 skill</h2>
+<pre><code>graphify install</code></pre>
+<p>預設註冊到 Claude Code。想裝進目前專案（而非使用者設定檔）加 <code>--project</code>：</p>
+<pre><code>graphify install --project
+graphify install --project --platform codex</code></pre>
+<p class="hint">PowerShell 使用者：用 <code>graphify .</code> 而不是 <code>/graphify .</code>——開頭的斜線在 PowerShell 是路徑分隔符。</p>
+
+<h2>Step 3 — 開你的 AI 助手，輸入</h2>
+<pre><code>/graphify .</code></pre>
+<p>就完成了。會在 <code>graphify-out/</code> 產生三個檔案：<code>graph.html</code>（瀏覽器可開）、<code>GRAPH_REPORT.md</code>、<code>graph.json</code>。</p>
+
+<h2>平台一覽（20+ 助手）</h2>
+<table class="platform-table">
+<tr><th>平台</th><th>安裝指令</th></tr>
+<tr><td>Claude Code（Linux/Mac）</td><td><code>graphify install</code></td></tr>
+<tr><td>Claude Code（Windows）</td><td><code>graphify install</code>（自動偵測）或 <code>--platform windows</code></td></tr>
+<tr><td>OpenCode</td><td><code>graphify install --platform opencode</code></td></tr>
+<tr><td>CodeBuddy</td><td><code>graphify install --platform codebuddy</code></td></tr>
+<tr><td>Codex</td><td><code>graphify install --platform codex</code></td></tr>
+<tr><td>Kilo Code</td><td><code>graphify install --platform kilo</code></td></tr>
+<tr><td>GitHub Copilot CLI</td><td><code>graphify install --platform copilot</code></td></tr>
+<tr><td>VS Code Copilot Chat</td><td><code>graphify vscode install</code></td></tr>
+<tr><td>Aider</td><td><code>graphify install --platform aider</code></td></tr>
+<tr><td>OpenClaw</td><td><code>graphify install --platform claw</code></td></tr>
+<tr><td>Factory Droid</td><td><code>graphify install --platform droid</code></td></tr>
+<tr><td>Trae / Trae CN</td><td><code>graphify install --platform trae</code> / <code>--platform trae-cn</code></td></tr>
+<tr><td>Gemini CLI</td><td><code>graphify install --platform gemini</code></td></tr>
+<tr><td>Hermes</td><td><code>graphify install --platform hermes</code></td></tr>
+<tr><td>Kimi Code</td><td><code>graphify install --platform kimi</code></td></tr>
+<tr><td>Amp</td><td><code>graphify amp install</code></td></tr>
+<tr><td>Agent Skills（跨框架）</td><td><code>graphify install --platform agents</code></td></tr>
+<tr><td>Kiro IDE/CLI</td><td><code>graphify kiro install</code></td></tr>
+<tr><td>Pi coding agent</td><td><code>graphify install --platform pi</code></td></tr>
+<tr><td>Cursor</td><td><code>graphify cursor install</code></td></tr>
+<tr><td>Devin CLI</td><td><code>graphify devin install</code></td></tr>
+<tr><td>Google Antigravity</td><td><code>graphify antigravity install</code></td></tr>
+</table>
+<p class="hint">Codex 使用者需在 <code>~/.codex/config.toml</code> 的 <code>[features]</code> 加 <code>multi_agent = true</code> 才能平行抽取。Codex 用 <code>$graphify</code> 而非 <code>/graphify</code>。</p>
+
+<h2>延伸套件（只需要裝你要的）</h2>
+<table class="platform-table">
+<tr><th>Extra</th><th>加上什麼</th><th>安裝</th></tr>
+<tr><td><code>pdf</code></td><td>PDF 抽取</td><td><code>uv tool install "graphifyy[pdf]"</code></td></tr>
+<tr><td><code>office</code></td><td>.docx / .xlsx</td><td><code>uv tool install "graphifyy[office]"</code></td></tr>
+<tr><td><code>video</code></td><td>影音轉錄（faster-whisper + yt-dlp）</td><td><code>uv tool install "graphifyy[video]"</code></td></tr>
+<tr><td><code>mcp</code></td><td>MCP stdio server</td><td><code>uv tool install "graphifyy[mcp]"</code></td></tr>
+<tr><td><code>neo4j</code> / <code>falkordb</code></td><td>圖資料庫推播</td><td><code>uv tool install "graphifyy[neo4j]"</code></td></tr>
+<tr><td><code>leiden</code></td><td>Leiden 社群偵測（僅 Python &lt; 3.13）</td><td><code>uv tool install "graphifyy[leiden]"</code></td></tr>
+<tr><td><code>ollama</code></td><td>Ollama 本機推論</td><td><code>uv tool install "graphifyy[ollama]"</code></td></tr>
+<tr><td><code>chinese</code></td><td>中文 query 分詞（jieba）</td><td><code>uv tool install "graphifyy[chinese]"</code></td></tr>
+<tr><td><code>all</code></td><td>上面全部</td><td><code>uv tool install "graphifyy[all]"</code></td></tr>
+</table>
+<p class="hint">還有 <code>google</code> / <code>gemini</code> / <code>anthropic</code> / <code>openai</code> / <code>azure</code> / <code>bedrock</code> / <code>sql</code> / <code>postgres</code> / <code>terraform</code> / <code>pascal</code> / <code>dm</code> / <code>svg</code> 等，完整清單見 <a href="docs/index.html">文件教學</a> 與上游 README。</p>
+
+<h2>讓助手「一直用圖」（always-on）</h2>
+<p>建完圖後執行一次，你的助手之後回答程式碼問題會優先查圖：</p>
+<pre><code>graphify opencode install    # 依你的平台調整</code></pre>
+<p>機制分兩種：</p>
+<ul>
+<li><strong>Hook 平台</strong>（Claude Code、Gemini CLI）：在搜尋類工具呼叫前自動觸發 hook，把助手導向圖。</li>
+<li><strong>指令檔平台</strong>（Codex、OpenCode、Cursor）：寫入 <code>AGENTS.md</code>、<code>.cursor/rules/</code> 等常駐指令檔，提供同樣的「先查圖」指引。</li>
+</ul>
+<p>要一次移除所有平台：<code>graphify uninstall</code>（加 <code>--purge</code> 會連 <code>graphify-out/</code> 一起刪）。</p>
+
+<h2>常見問題</h2>
+<ul>
+<li><strong><code>graphify: command not found</code></strong> → uv/pipx 的 bin 目錄（<code>~/.local/bin</code>）不在 PATH。跑 <code>uv tool update-shell</code> 或 <code>pipx ensurepath</code> 後開新終端。</li>
+<li><strong><code>uvx graphify …</code> 解析失敗</strong> → 套件叫 <code>graphifyy</code>：用 <code>uvx --from graphifyy graphify install</code>。</li>
+<li><strong>PowerShell 路徑不認</strong> → 用 <code>graphify .</code>（去斜線）。</li>
+<li><strong>文件/PDF 抽取回傳空</strong> → 文件需要 LLM key（純程式碼不需）。設好 API key 後用 <code>graphify extract ./docs --backend claude</code>（依你用的後端）。</li>
+<li><strong>版本警告</strong> → 升級後要重新註冊 skill：<code>uv tool upgrade graphifyy</code> 再 <code>graphify install</code>。</li>
+</ul>
+
+<div class="callout"><strong>OpenCode 使用者特別注意</strong>：本站的安裝示範就是在 OpenCode 環境實測的——<code>graphify install --platform opencode</code> 會把 skill 註冊到 <code>~/.config/opencode/</code>，並寫入 <code>AGENTS.md</code> 讓它常駐。安裝後在任何專案輸入 <code>/graphify .</code> 即可。</div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

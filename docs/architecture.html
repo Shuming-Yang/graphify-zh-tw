@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>架構總覽 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>架構總覽</h1>
+  <div class="subtitle">14 個模組、七階段 pipeline、怎麼新增一個語言抽取器</div>
+  <div class="badge-line">來源：<code>ARCHITECTURE.md</code> + <code>AGENTS.md</code></div>
+</header>
+
+<div class="guide">
+
+<h2>定位</h2>
+<p>Graphify 是一個「<strong>Claude Code skill + Python 函式庫</strong>」的組合：skill 指揮函式庫，函式庫也可以獨立使用。</p>
+
+<h2>Pipeline：七個階段、一個函數一個模組</h2>
+<pre><code>detect()  →  extract()  →  build_graph()  →  cluster()  →  analyze()  →  report()  →  export()</code></pre>
+<p>每個階段都是自己模組裡的一個函數。它們用純 Python dict 與 NetworkX 圖溝通——<strong>沒有共享狀態，除了 <code>graphify-out/</code> 之外沒有副作用</strong>。這個「每個模組只管一件事、介面乾淨」的設計，是整個 codebase 最好懂的地方。</p>
+
+<h2>模組職責表</h2>
+<table>
+<tr><th>模組</th><th>函數</th><th>輸入 → 輸出</th></tr>
+<tr><td><code>detect.py</code></td><td><code>collect_files(root)</code></td><td>目錄 → 過濾後的 <code>[Path]</code></td></tr>
+<tr><td><code>extract.py</code></td><td><code>extract(path)</code></td><td>檔案路徑 → <code>{nodes, edges}</code> dict</td></tr>
+<tr><td><code>build.py</code></td><td><code>build_graph(extractions)</code></td><td>extraction dict 列表 → <code>nx.Graph</code></td></tr>
+<tr><td><code>cluster.py</code></td><td><code>cluster(G)</code></td><td>圖 → 每個節點帶 <code>community</code> 屬性的圖</td></tr>
+<tr><td><code>analyze.py</code></td><td><code>analyze(G)</code></td><td>圖 → 分析 dict（god nodes、surprises、questions）</td></tr>
+<tr><td><code>report.py</code></td><td><code>render_report(G, analysis)</code></td><td>圖 + 分析 → GRAPH_REPORT.md 字串</td></tr>
+<tr><td><code>export.py</code></td><td><code>export(G, out_dir, ...)</code></td><td>圖 → Obsidian vault、graph.json、graph.html、graph.svg</td></tr>
+<tr><td><code>callflow_html.py</code></td><td><code>write_callflow_html(...)</code></td><td>graphify-out 檔案 → Mermaid 架構/呼叫流 HTML</td></tr>
+<tr><td><code>ingest.py</code></td><td><code>ingest(url, ...)</code></td><td>URL → 存進 corpus 目錄的檔案</td></tr>
+<tr><td><code>cache.py</code></td><td><code>check_semantic_cache / save_semantic_cache</code></td><td>檔案 → (cached, uncached) 分割</td></tr>
+<tr><td><code>security.py</code></td><td>驗證 helpers</td><td>URL / 路徑 / label → 通過驗證或拋錯</td></tr>
+<tr><td><code>validate.py</code></td><td><code>validate_extraction(data)</code></td><td>extraction dict → schema 錯誤時拋錯</td></tr>
+<tr><td><code>serve.py</code></td><td><code>start_server(graph_path)</code></td><td>圖檔路徑 → MCP stdio server</td></tr>
+<tr><td><code>watch.py</code></td><td><code>watch(root, flag_path)</code></td><td>目錄 → 變更時寫 flag 檔</td></tr>
+<tr><td><code>benchmark.py</code></td><td><code>run_benchmark(graph_path)</code></td><td>圖 → 語料 vs 子圖 token 比較</td></tr>
+</table>
+
+<div class="callout info"><strong>怎麼記</strong>：前七個（detect→export）是主線 pipeline，後八個是圍繞它的服務（ingest 進料、cache 加速、security/validate 把關、serve/watch 對外）。程式碼對照區會逐函數講：<a href="code/pipeline.html">主線</a>、<a href="code/ops.html">服務層</a>、<a href="code/analysis.html">分析與報告</a>、<a href="code/export.html">輸出</a>。</div>
+
+<h2>抽取輸出 Schema</h2>
+<p>每個 extractor 回傳同樣的形狀，<code>validate.py</code> 在 <code>build_graph()</code> 之前強制檢查：</p>
+<pre><code>{
+  "nodes": [
+    {"id": "unique_string", "label": "human name", "source_file": "path", "source_location": "L42"}
+  ],
+  "edges": [
+    {"source": "id_a", "target": "id_b", "relation": "calls|imports|uses|...", "confidence": "EXTRACTED|INFERRED|AMBIGUOUS"}
+  ]
+}</code></pre>
+
+<h2>如何新增一個語言抽取器</h2>
+<p>官方文件列出的 5 個步驟——這是給想貢獻的人的入門路線圖：</p>
+<ol>
+<li>在 <code>extract.py</code> 加一個 <code>extract_&lt;lang&gt;(path) -&gt; dict</code>，遵循既有模式（tree-sitter 解析 → 走訪節點 → 收集 nodes/edges → 第二遍呼叫圖產生 INFERRED <code>calls</code> 邊）。</li>
+<li>在 <code>extract()</code> dispatch 與 <code>collect_files()</code> 註冊副檔名。</li>
+<li>把副檔名加進 <code>detect.py</code> 的 <code>CODE_EXTENSIONS</code> 與 <code>watch.py</code> 的 <code>_WATCHED_EXTENSIONS</code>。</li>
+<li>在 <code>pyproject.toml</code> 加 tree-sitter 套件。</li>
+<li>在 <code>tests/fixtures/</code> 加 fixture 檔、在 <code>tests/test_languages.py</code> 加測試。</li>
+</ol>
+
+<h2>安全入口</h2>
+<p>所有外部輸入在使用前都會先經過 <code>graphify/security.py</code>：</p>
+<table>
+<tr><th>輸入</th><th>驗證</th></tr>
+<tr><td>URL</td><td><code>validate_url()</code>（只允許 http/https）+ <code>_NoFileRedirectHandler</code>（擋 file:// 轉址）</td></tr>
+<tr><td>抓取的內容</td><td><code>safe_fetch()</code> / <code>safe_fetch_text()</code>（大小上限、逾時）</td></tr>
+<tr><td>圖檔路徑</td><td><code>validate_graph_path()</code>（必須解析到 <code>graphify-out/</code> 內）</td></tr>
+<tr><td>節點 label</td><td><code>sanitize_label()</code>（去除控制字元、上限 256 字元、HTML escape）</td></tr>
+</table>
+
+<h2>測試</h2>
+<p>每個模組一個測試檔（<code>tests/test_*.py</code>）。跑法：</p>
+<pre><code>pytest tests/ -q</code></pre>
+<p>全部都是純單元測試——不碰網路、不寫 <code>tmp_path</code> 以外的檔案系統。</p>
+
+<h2>AGENTS.md：這個 repo 自己怎麼用 graphify</h2>
+<p>有趣的是，Graphify 用自己的 product 管理自己：repo 裡有 <code>graphify-out/</code>，AGENTS.md 規定：</p>
+<details class="en-toggle"><summary>展開英文原文：AGENTS.md</summary><div>
+<pre><code>This project has a graphify knowledge graph at graphify-out/.
+
+Rules:
+- Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md
+- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
+- After modifying code files in this session, run `graphify update .`</code></pre>
+</div></details>
+<p>也就是「先讀圖、再回答」——Dogfooding 的最好示範。本站做這個教學網站時，也是用同樣的邏輯在組織內容。</p>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

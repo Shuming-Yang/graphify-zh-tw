@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>效能基準 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>效能基準</h1>
+  <div class="subtitle">Graphify 作為記憶層與程式碼智慧層的測量結果</div>
+  <div class="badge-line">來源：<code>BENCHMARKS.md</code> · 最後更新 2026-07-05</div>
+</header>
+
+<div class="guide">
+
+<h2>重點摘要</h2>
+<p>Graphify 在開放 harness 上與其他系統在同一模型、同一預算、同一裁判下比較：</p>
+<ul>
+<li><strong>LOCOMO retrieval recall@10 = 0.497</strong>——大約是 mem0（0.048）的 10 倍、高於 BM25（0.362）。</li>
+<li><strong>LOCOMO QA accuracy 45.3%</strong>：比 mem0 高 18 分、比 BM25 高 14 分，跟 supermemory（49.7%）差 4.4 分，但 ingest 成本只要它約十分之一。</li>
+<li><strong>LongMemEval-S 76%</strong>，與 dense RAG 並列最佳。</li>
+<li><strong>建圖零 LLM 成本</strong>，記憶 ingest 比 supermemory 便宜約 11 倍（$1.40 vs $15.67）。</li>
+</ul>
+<p>所有系統共用同一個模型（Kimi K2.6）、相同預算，裁判與第二個獨立裁判盲驗的一致性 90.6%（Cohen's kappa 0.81）。</p>
+
+<h2>一眼表</h2>
+<table>
+<tr><th>套件</th><th>資料集 (n)</th><th>指標</th><th>graphify</th><th>場上對手</th></tr>
+<tr><td>Memory</td><td>LOCOMO (300)</td><td>QA accuracy</td><td>45.3%</td><td>supermemory 49.7%（11× ingest 成本）· bm25 31.3% · mem0 27.3%</td></tr>
+<tr><td>Memory</td><td>LOCOMO (300)</td><td>recall@10</td><td>0.497</td><td>bm25 0.362 · mem0 0.048</td></tr>
+<tr><td>Memory</td><td>LongMemEval-S (50)</td><td>QA accuracy</td><td>76%</td><td>dense RAG 76% · hybrid 74% · mem0 70%</td></tr>
+<tr><td>Cost</td><td>LOCOMO ingest</td><td>USD</td><td>~$1.40</td><td>supermemory $15.67 · mem0 $3.48</td></tr>
+<tr><td>Cost</td><td>graph build</td><td>LLM credits</td><td>$0</td><td>多數系統按 token 計費</td></tr>
+</table>
+
+<h2>怎麼測的：同一個 harness</h2>
+<p>Graphify 用自己的 harness，把其他系統（mem0、supermemory）當 adapter 塞進同一條流水線，所以大家看到的是同一個模型、同一 token 預算、同一個裁判：</p>
+<pre><code>ingest  ->  index  ->  search  ->  answer  ->  grade
+(build)     (store)    (retrieve)  (Kimi K2.6) (key-fact coverage)</code></pre>
+<ul>
+<li><strong>記憶套件</strong>（<code>memory/</code>）：graphify 圖檢索 vs 專用記憶系統（mem0、supermemory）與經典基線（BM25、dense RAG、hybrid RRF）。mem0/supermemory 以 self-hosted adapter 形式、透過 proxy 接上同一個 Kimi K2.6。</li>
+<li><strong>程式碼套件</strong>（<code>crosstool/</code>）：固定程式代理（Claude Opus 4.8、最多 14 回合）在 ERPNext（約 1M 行）上回答評分問題，含 2011–2026 共 689 個每週 AST checkpoints 的時間子套件。</li>
+</ul>
+
+<h3>裁判怎麼評</h3>
+<p>答案由 Kimi K2.6 對照「一組正確答案必須包含的原子關鍵事實」評分：</p>
+<pre><code>coverage = (covered + 0.5 * partial) / total</code></pre>
+<p>每個評分都引述答案原文，所以可稽核而非一個不透明的分數。裁判本身先經盲驗（90.6% 一致、kappa 0.81）——多數發表的記憶基準完全不公開裁判驗證。</p>
+
+<h2>公平規則</h2>
+<ul>
+<li>所有 LLM 角色同一個模型：Kimi K2.6（Moonshot）。</li>
+<li>共用本機 embedder（BGE-m3，1024-d，多語言）。</li>
+<li>相同 token 預算；每次跑都寫 spend ledger、遵守 <code>--max-spend</code>。</li>
+<li>圖只用 AST 建（無 LLM）；embedding 用本機確定性模型。</li>
+</ul>
+
+<h2>記憶結果：LOCOMO（n=300）</h2>
+<p>依 recall@10 排序：</p>
+<table>
+<tr><th>系統</th><th>QA accuracy</th><th>recall@10</th><th>Ingest 成本</th></tr>
+<tr><td><strong>graphify</strong> (graph-expand)</td><td><strong>45.3%</strong></td><td><strong>0.497</strong></td><td>~$1.40</td></tr>
+<tr><td>hybrid RRF</td><td>43.3%</td><td>0.493</td><td>$0（共享索引）</td></tr>
+<tr><td>graphify (SurrealDB engine)</td><td>43.3%</td><td>0.485</td><td>$0</td></tr>
+<tr><td>dense RAG</td><td>41.3%</td><td>0.439</td><td>$0</td></tr>
+<tr><td>BM25</td><td>31.3%</td><td>0.362</td><td>$0</td></tr>
+<tr><td>supermemory</td><td>49.7%</td><td>0.149*</td><td>$15.67</td></tr>
+<tr><td>mem0</td><td>27.3%</td><td>0.048</td><td>$3.48</td></tr>
+</table>
+<p class="hint">* supermemory 的 recall 被 embedder 綁住：它用自己的 768-d 純英文 embedder，而非共用的 BGE-m3。QA accuracy 軸（共用 Kimi 讀者 + 裁判）才是乾淨的比較。</p>
+<p><strong>怎麼讀這張表</strong>：supermemory 原始 QA 高幾十分，但 ingest 成本約 11 倍、recall 差約 3 倍。Graphify 是測過系統中 LOCOMO 檢索 recall 最好的、共用 embedder 上 QA 最好的，成本約 supermemory 的十分之一——檢索正確記憶的次數約是 mem0 的 10 倍、答案準確度高 18 分。只做 seed 的消融（不圖擴充）仍有 42.7% / $1.40，所以最便宜設定就保有大部分準確度。</p>
+
+<h2>記憶結果：LongMemEval-S（n=50）</h2>
+<table>
+<tr><th>系統</th><th>QA accuracy</th><th>recall@10</th></tr>
+<tr><td><strong>graphify</strong> (graph-expand)</td><td><strong>76%</strong></td><td><strong>0.844</strong></td></tr>
+<tr><td>dense RAG</td><td>76%</td><td>0.848</td></tr>
+<tr><td>graphify (SurrealDB engine)</td><td>74%</td><td>0.833</td></tr>
+<tr><td>hybrid RRF</td><td>74%</td><td>0.822</td></tr>
+<tr><td>BM25</td><td>70%</td><td>0.710</td></tr>
+<tr><td>mem0</td><td>70%</td><td>0.344</td></tr>
+</table>
+<p>Graphify 與 dense RAG 並列最佳 QA（76%）；dense RAG 在 recall 上小勝（0.848 vs 0.844）。兩者都遠勝 mem0（recall 0.344）。</p>
+
+<h2>程式碼智慧：ERPNext</h2>
+<p>在約 1M 行的 ERPNext 上，給固定程式代理一個 graphify 工具，把評分問題集（n=6）的關鍵事實覆蓋率從 70.8%（grep+read 基線）拉到 <strong>82.0%</strong>，每次查詢約 140K token。Graphify 在準確度上勝過掃原始檔，並避開「把整個 repo 塞進每回合」的 context-stuffing 反模式（那要花約 20 倍 token、覆蓋率反而更低）。</p>
+
+<h2>時間子套件：15 年 ERPNext</h2>
+<p>689 個每週 AST checkpoints（2011–2026），確定性建圖、零 LLM：</p>
+<table>
+<tr><th>Checkpoint</th><th>Nodes</th><th>Edges</th><th>Files</th></tr>
+<tr><td>2011-06-08</td><td>3,069</td><td>2,900</td><td>1,032</td></tr>
+<tr><td>2026-06-24</td><td>22,620</td><td>48,710</td><td>3,758</td></tr>
+</table>
+<p>15 年間節點成長約 7 倍、邊成長約 17 倍。程式庫越大，純詞彙檢索找到的答案越少，而圖與語意檢索跟著規模成長，AST 抽取本身保持穩定。</p>
+
+<h2>成本與 token 經濟</h2>
+<ul>
+<li>建圖零 LLM 成本：tree-sitter（約 40 語言、確定性）+ 本機 embedder，建索引不用 API token。多數記憶/語意檢索系統要付逐文件的 LLM ingest 費。</li>
+<li>記憶 ingest 約 11 倍便宜：LOCOMO ingest 約 $1.40，supermemory 要 $15.67。</li>
+<li>每個數字背後都有 harness 輸出的 per-run spend ledger。</li>
+</ul>
+
+<h2>重現</h2>
+<p>設 <code>MOONSHOT_API_KEY</code>，資料集抓到 harness 文件中說明的本機布局，每次跑遵守 <code>--max-spend</code> 並寫 spend ledger：</p>
+<pre><code># 記憶（LOCOMO）——呼叫 SurrealDB engine 那一行（43.3%）；graph-expand 頭條（45.3%）是同一 harness 的獨立 adapter
+python memory/runner.py --phase 3 --split locomo --n 300 \
+  --adapters graphify_v1_surreal --cn natural --workers 6 --max-spend 15
+
+# 程式碼跨工具（ERPNext）
+python crosstool/run.py --repo erpnext --max-spend &lt;budget&gt;</code></pre>
+
+<div class="callout warn"><strong>提醒</strong>：這些是上游自測的數字（self-reported benchmark），公開的 harness 與裁判引述讓它可稽核、可重現，但引用時記得標明出處與前提（同一模型、同一預算）。本站翻譯自 <code>BENCHMARKS.md</code>。</div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

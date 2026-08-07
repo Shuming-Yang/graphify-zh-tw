@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>安全模型 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>安全模型</h1>
+  <div class="subtitle">威脅面逐條解析——Graphify 保護什麼、不保護什麼</div>
+  <div class="badge-line">來源：<code>SECURITY.md</code></div>
+</header>
+
+<div class="guide">
+
+<h2>定位先講清楚</h2>
+<p>Graphify 是<strong>本機開發工具</strong>：它作為 Claude Code skill 與（可選的）本機 MCP stdio server 執行。圖分析期間<strong>不做任何網路呼叫</strong>——只有 <code>ingest</code>（使用者明確抓 URL）才會碰網路。支援版本：0.3.x 受支援，&lt; 0.3 不受支援。</p>
+
+<h2>威脅面解析</h2>
+<table>
+<tr><th>威脅向量</th><th>緩解方式</th></tr>
+<tr><td>URL 抓取的 SSRF</td><td><code>security.validate_url()</code> 只允許 http/https，擋掉私有/迴環/link-local IP 與雲端 metadata endpoint；轉址目標會重新驗證。所有抓取路徑（含 tweet oEmbed）都經過 <code>safe_fetch()</code>。</td></tr>
+<tr><td>過大下載</td><td><code>safe_fetch()</code> 串流回應並在 50 MB 中止；<code>safe_fetch_text()</code> 在 10 MB 中止。</td></tr>
+<tr><td>非 2xx HTTP</td><td><code>safe_fetch()</code> 對非 2xx 拋 <code>HTTPError</code>——錯誤頁不會被當成內容。</td></tr>
+<tr><td>MCP server 路徑穿越</td><td><code>security.validate_graph_path()</code> 解析路徑並要求必須在 <code>graphify-out/</code> 內，且該目錄必須存在。</td></tr>
+<tr><td>圖 HTML 的 XSS</td><td><code>security.sanitize_label()</code> 去除控制字元、上限 256 字元，並在 pyvis 嵌入前對所有節點 label 與邊 title 做 HTML-escape。</td></tr>
+<tr><td>節點 label 的 prompt injection</td><td><code>sanitize_label()</code> 也套用於 MCP 文字輸出——使用者控制的檔案 label 無法破壞回傳給代理的文字格式。</td></tr>
+<tr><td>原始檔內容的 prompt injection</td><td>語意 pass 期間原始檔是混進 LLM context 的攻擊者可控文字。<code>_read_files()</code> 在 <code>llm.py</code> 用 <code>&lt;untrusted_source path=... sha256=...&gt;</code> 雜湊戳記包住每個檔案；抽取 system prompt 要求模型把該區塊當惰性資料、絕不當指令；<code>_neutralise_injection_sentinels()</code> 在插入前解除 <code>&lt;|im_start|&gt;</code>、<code>[INST]</code>、<code>&lt;&lt;SYS&gt;&gt;</code>、偽造 <code>&lt;/untrusted_source&gt;</code> 等已知 chat-template/jailbreak 記號。這是 table-stakes 防禦（issue #1210）：不是讓 injection 不可能，而是讓它從「第一次就成功」變成「需要繞過」。</td></tr>
+<tr><td>YAML frontmatter injection</td><td><code>_yaml_str()</code> 在嵌入使用者控制字串（網頁標題、查詢問題）前 escape 反斜線、雙引號與換行。</td></tr>
+<tr><td>來源檔編碼當機</td><td>所有 tree-sitter byte slice 用 <code>errors="replace"</code> 解碼——非 UTF-8 來源檔優雅降級而非中止抽取。</td></tr>
+<tr><td>Symlink 穿越</td><td><code>detect.py</code> 全境用 <code>os.walk(..., followlinks=False)</code>。</td></tr>
+<tr><td>損壞的 graph.json</td><td><code>serve.py</code> 的 <code>_load_graph()</code> 包住 <code>json.JSONDecodeError</code>，印出清楚的復原訊息而非當機。</td></tr>
+</table>
+
+<h2>Graphify 不做的事</h2>
+<ul>
+<li>預設不跑網路監聽（stdio transport）；<code>--transport http</code> 是 opt-in、有文件，並綁 <code>127.0.0.1</code>（除非傳 <code>--host 0.0.0.0</code>）。</li>
+<li>不執行來源檔的程式碼（tree-sitter 只解析 AST，無 eval/exec）。</li>
+<li>任何 subprocess 呼叫都不用 <code>shell=True</code>。</li>
+<li>不儲存憑證或 API key。</li>
+</ul>
+
+<h2>可選的網路呼叫</h2>
+<ul>
+<li><code>ingest</code> subcommand：抓使用者明確提供的 URL。</li>
+<li>PDF 抽取：只讀本機檔案（pypdf 不做網路呼叫）。</li>
+<li>watch 模式：只有本機檔案系統事件（watchdog 不做網路呼叫）。</li>
+</ul>
+
+<h2>回報漏洞</h2>
+<p><strong>不要為資安漏洞開公開 issue。</strong>用 GitHub 的 private vulnerability reporting 或直接 email 維護者，並附上：漏洞描述、重現步驟、潛在影響、建議修法。48 小時內會回覆收件，重大問題目標 7 天內修復。</p>
+
+<div class="callout info"><strong>本站觀點</strong>：這份威脅面模型是「本機工具的務實安全」——重點不在防禦無敵，而在「預設不碰網路、不執行、不 shell、輸入一律消毒、LLM 資料包成不可信區塊」。想讀實作，<a href="code/ops.html">程式碼對照 · ops</a> 裡有 <code>security.py</code> 的逐函數講解。</div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

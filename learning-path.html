@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>學習路線 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="index.html">首頁</a>
+  <a href="map.html">概念地圖</a>
+  <a href="learning-path.html">學習路線</a>
+  <a href="install.html">安裝指南</a>
+  <a href="docs/index.html">文件教學</a>
+  <a href="docs/code/index.html">程式碼對照</a>
+  <a href="docs/worked.html">實作案例</a>
+  <a href="about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 回首頁</a></div>
+<header>
+  <h1>學習路線</h1>
+  <div class="subtitle">不想只看懂、想真的上手？從 L0 一路練到 L4</div>
+</header>
+
+<div class="guide">
+
+<div class="level lv-emerald">
+  <div class="level-head"><span class="level-badge">L0</span><span class="level-title">先裝起來</span><span class="level-sub">5 分鐘 · 讓 <code>graphify</code> 指令跑起來</span></div>
+  <div class="card-grid">
+    <div class="card">
+      <span class="c-name">安裝 CLI</span>
+      <span class="c-zh"><code>uv tool install graphifyy</code>（PyPI 套件名是 <code>graphifyy</code> 雙 y，指令是 <code>graphify</code>）</span>
+      <span class="c-tags"><span class="c-tag">install.html</span></span>
+    </div>
+    <div class="card">
+      <span class="c-name">註冊 skill</span>
+      <span class="c-zh"><code>graphify install</code>（預設 Claude Code）或 <code>--platform opencode</code> 指定其他平台</span>
+      <span class="c-tags"><span class="c-tag">install.html</span></span>
+    </div>
+  </div>
+</div>
+
+<div class="level lv-cyan">
+  <div class="level-head"><span class="level-badge">L1</span><span class="level-title">跑一次真的</span><span class="level-sub">15 分鐘 · 對自己手上的一個專案建圖</span></div>
+  <div class="card-grid">
+    <div class="card">
+      <span class="c-name">對專案建圖</span>
+      <span class="c-zh">在專案裡輸入 <code>/graphify .</code>，產生 <code>graphify-out/</code>（graph.json + GRAPH_REPORT.md + graph.html）</span>
+      <span class="c-tags"><span class="c-tag">docs/how-it-works.html</span></span>
+    </div>
+    <div class="card">
+      <span class="c-name">看報告</span>
+      <span class="c-zh">打開 <code>GRAPH_REPORT.md</code>：god nodes、surprising connections、建議問題</span>
+      <span class="c-tags"><span class="c-tag">docs/how-it-works.html</span></span>
+    </div>
+    <div class="card">
+      <span class="c-name">玩互動圖</span>
+      <span class="c-zh">用瀏覽器開 <code>graph.html</code>，點節點、搜尋、隱藏社群——本站有真實範例可玩</span>
+      <span class="c-tags"><span class="c-tag">docs/worked.html</span></span>
+    </div>
+  </div>
+</div>
+
+<div class="level lv-amber">
+  <div class="level-head"><span class="level-badge">L2</span><span class="level-title">用圖取代 grep</span><span class="level-sub">30 分鐘 · 三個查詢指令上手</span></div>
+  <div class="card-grid">
+    <div class="card">
+      <span class="c-name">query</span>
+      <span class="c-zh"><code>graphify query "什麼連接著 auth 與資料庫？"</code>——自然語言問問題，回傳局部子圖</span>
+      <span class="c-tags"><span class="c-tag">docs/code/cli.html</span></span>
+    </div>
+    <div class="card">
+      <span class="c-name">path</span>
+      <span class="c-zh"><code>graphify path "UserService" "DatabasePool"</code>——兩件事之間的最短路徑</span>
+      <span class="c-tags"><span class="c-tag">docs/code/cli.html</span></span>
+    </div>
+    <div class="card">
+      <span class="c-name">explain</span>
+      <span class="c-zh"><code>graphify explain "RateLimiter"</code>——一個節點與它所有鄰居</span>
+      <span class="c-tags"><span class="c-tag">docs/code/cli.html</span></span>
+    </div>
+    <div class="card">
+      <span class="c-name">讓助手一直用圖</span>
+      <span class="c-zh"><code>graphify opencode install</code> 等指令，把「先查圖」寫進 AGENTS.md / hook，不再想起來才用</span>
+      <span class="c-tags"><span class="c-tag">docs/skill-files.html</span></span>
+    </div>
+  </div>
+</div>
+
+<div class="level lv-fuchsia">
+  <div class="level-head"><span class="level-badge">L3</span><span class="level-title">讀懂原理</span><span class="level-sub">1-2 小時 · 圖是怎麼建出來的</span></div>
+  <div class="card-grid">
+    <div class="card">
+      <span class="c-name">三遍處理</span>
+      <span class="c-zh">Pass 1 AST 抽取（免費）→ Pass 2 影音轉錄（本機）→ Pass 3 文件/PDF 語意抽取（LLM）</span>
+      <span class="c-tags"><span class="c-tag">docs/how-it-works.html</span></span>
+    </div>
+    <div class="card">
+      <span class="c-name">社群與信賴</span>
+      <span class="c-zh">Leiden 分群、EXTRACTED/INFERRED/AMBIGUOUS 信任標籤、0.55–0.95 信賴級距</span>
+      <span class="c-tags"><span class="c-tag">map.html</span></span>
+    </div>
+    <div class="card">
+      <span class="c-name">七階段 pipeline</span>
+      <span class="c-zh">detect → extract → build → cluster → analyze → report → export，每個模組一個函數</span>
+      <span class="c-tags"><span class="c-tag">docs/architecture.html</span></span>
+    </div>
+    <div class="card">
+      <span class="c-name">效能與成本</span>
+      <span class="c-zh">71.5× token 節省怎麼來的、為什麼圖越大越省、LOCOMO 45.3% 基準怎麼測的</span>
+      <span class="c-tags"><span class="c-tag">docs/benchmarks.html</span></span>
+    </div>
+  </div>
+</div>
+
+<div class="level lv-violet">
+  <div class="level-head"><span class="level-badge">L4</span><span class="level-title">讀源碼</span><span class="level-sub">進階 · 本站最深的章節</span></div>
+  <div class="card-grid">
+    <div class="card">
+      <span class="c-name">CLI 指令層</span>
+      <span class="c-zh">cli.py 的 subcommand 架構，每個指令對應哪個模組</span>
+      <span class="c-tags"><span class="c-tag">docs/code/cli.html</span></span>
+    </div>
+    <div class="card">
+      <span class="c-name">抽取 pipeline</span>
+      <span class="c-zh">detect / extract / build / cluster 逐函數講解——AST 怎麼變成圖</span>
+      <span class="c-tags"><span class="c-tag">docs/code/pipeline.html</span></span>
+    </div>
+    <div class="card">
+      <span class="c-name">語言抽取器</span>
+      <span class="c-zh">extractors/ 骨架與各語言實作，models / engine / resolution</span>
+      <span class="c-tags"><span class="c-tag">docs/code/extractors.html</span></span>
+    </div>
+    <div class="card">
+      <span class="c-name">分析與輸出</span>
+      <span class="c-zh">analyze / report / export / exporters，graph.html 是怎麼生成的</span>
+      <span class="c-tags"><span class="c-tag">docs/code/analysis.html · docs/code/export.html</span></span>
+    </div>
+    <div class="card">
+      <span class="c-name">維運與安全</span>
+      <span class="c-zh">cache / dedup / ingest / watch / serve / security / validate</span>
+      <span class="c-tags"><span class="c-tag">docs/code/ops.html</span></span>
+    </div>
+    <div class="card">
+      <span class="c-name">skillgen 與測試</span>
+      <span class="c-zh">技能檔怎麼從 fragments 產出、測試策略與 fixtures 設計</span>
+      <span class="c-tags"><span class="c-tag">docs/code/skillgen.html · docs/code/tests.html</span></span>
+    </div>
+  </div>
+</div>
+
+<div class="callout"><strong>給自己的驗收題</strong>：L1 結束後，你能在自己專案跑一次並說出 god node 是誰嗎？L2 結束後，你能不看原始檔就回答「A 跟 B 怎麼接上的」嗎？L3 結束後，你能解釋 INFERRED 0.85 跟 0.75 的差別嗎？能答出來，就往下走。</div>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

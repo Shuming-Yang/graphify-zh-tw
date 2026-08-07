@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>技能檔結構拆解 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>技能檔結構拆解</h1>
+  <div class="subtitle">SKILL.md 是 <code>/graphify</code> 的大腦——它怎麼指揮 AI 助手，references/ 又裝了什麼</div>
+  <div class="badge-line">來源：<code>graphify/skill.md</code> · <code>graphify/skill-opencode.md</code> · <code>graphify/skills/opencode/references/</code>（8 篇）</div>
+</header>
+
+<div class="guide">
+
+<h2>先講清楚：skill 檔是「給 AI 助手看的指令」</h2>
+<p>Graphify 作為一個 Claude Code / OpenCode / Cursor 的 skill，它的「本體」其實是一份 <strong>SKILL.md</strong>——一份寫給 AI 代理看的操作手冊。當你在助手裡輸入 <code>/graphify .</code>，助手讀這份檔案，照著裡面的 <code>## What You Must Do When Invoked</code> 和 <code>Step 0–9</code> 一步步執行。</p>
+<p>這份檔案的設計重點：</p>
+<ul>
+<li><strong>輕量核心 + 按需載入的 references</strong>：SKILL.md 本身只講流程，細節（query 怎麼走、extraction prompt 長什麼樣）放在 <code>references/</code> 側車，需要時才載入。</li>
+<li><strong>Fast path</strong>：如果 <code>graphify-out/graph.json</code> 已存在且使用者問的是自然語言問題，直接跳過建圖、立刻跑 <code>graphify query</code>。</li>
+<li><strong>Interpreter guard</strong>：所有 subcommand 用 <code>$(cat graphify-out/.graphify_python)</code> 指定 Python 直譯器，避免用錯環境。</li>
+<li><strong>Honesty Rules</strong>：最後一段規定助手必須誠實（不誇大、標註不確定）。</li>
+</ul>
+
+<h2>Frontmatter：兩個欄位決定一切</h2>
+<pre><code>---
+name: graphify
+description: "Use for any question about a codebase, its architecture, file relationships, or project content — especially when graphify-out/ exists, where the question should be treated as a graphify query first. …"
+---</code></pre>
+<p>這兩個欄位就是 skill 的「名片」——<code>name</code> 決定安裝資料夾名稱，<code>description</code> 決定助手<strong>何時</strong>認為該用這個 skill。Graphify 的 description 刻意很寬：任何程式碼庫問題都可能觸發。skillgen 的 <code>platforms.toml</code> 規定 description「PRESERVED VERBATIM per platform」——各平台保留同樣的 description。</p>
+
+<h2>SKILL.md 的主體：Step 0–9</h2>
+<p>核心流程是「What You Must Do When Invoked」之後的九個步驟（每個平台版本大同小異）：</p>
+<table>
+<tr><th>Step</th><th>做什麼</th><th>備註</th></tr>
+<tr><td><code>Step 0</code></td><td>GitHub URL / 多路徑 merge</td><td>只在給了 URL 或多個路徑時執行</td></tr>
+<tr><td><code>Step 1</code></td><td>確保 graphify 已安裝</td><td>檢查 <code>graphify --version</code>，缺就裝</td></tr>
+<tr><td><code>Step 2</code></td><td>偵測檔案</td><td><code>graphify-out/.graphify_detect.json</code></td></tr>
+<tr><td><code>Step 2.5</code></td><td>影音轉錄</td><td>只有偵測到 video 才跑</td></tr>
+<tr><td><code>Step 3</code></td><td>抽取實體與關係</td><td>Part A AST（本機）+ Part B 語意（LLM，讀 <code>extraction-spec.md</code>）</td></tr>
+<tr><td><code>Step 4</code></td><td>建圖、分群、分析、產出</td><td>build + cluster + analyze + graph.html + GRAPH_REPORT</td></tr>
+<tr><td><code>Step 4.5</code></td><td>圖健康檢查</td><td>唯讀完整性 gate</td></tr>
+<tr><td><code>Step 5</code></td><td>社群命名</td><td>用設定好的後端自動取名</td></tr>
+<tr><td><code>Step 6</code></td><td>Obsidian vault + HTML</td><td>vault 是 opt-in</td></tr>
+<tr><td><code>Steps 6b–8</code></td><td>Wiki / Neo4j / FalkorDB / SVG / GraphML / MCP / benchmark</td><td>只在對應 flag 出現時跑</td></tr>
+<tr><td><code>Step 9</code></td><td>存 manifest、更新成本、清理、報告</td><td>收尾</td></tr>
+</table>
+
+<p>檔案後段還有幾個「分流入口」：<code>## For --update and --cluster-only</code>、<code>## For /graphify query</code>、<code>## For /graphify add and --watch</code>、<code>## For the commit hook …</code>——依照使用者的指令類型跳到對應章節。最後是 <code>## Honesty Rules</code>。</p>
+
+<details class="en-toggle"><summary>展開英文原文：What You Must Do When Invoked（Fast path）</summary><div>
+<pre><code>**Fast path — existing graph:** Before doing anything else, check whether
+`graphify-out/graph.json` exists. The expected location is
+`graphify-out/graph.json` relative to the **current working directory**. If it
+exists AND the user's request is a natural-language question about the
+codebase (e.g. "How does X work?", "What calls Y?") AND NOT an explicit rebuild
+command (`--update`, `--cluster-only`, or a bare path/URL): **skip Steps 1–5
+entirely and jump straight to `## For /graphify query`.** Run
+`graphify query "<question>"` immediately. Do not run detect. Do not check
+corpus size. Do not ask the user to narrow. The graph is already built — use it.</code></pre>
+</div></details>
+
+<h2>references/ 側車：8 篇參考檔（以 opencode 為例）</h2>
+<p>每個平台都有 <code>graphify/skills/&lt;platform&gt;/references/</code>，同一組 8 篇（部分平台內容因 hook 機制略異）。SKILL.md 裡 <code>Load this when…</code> 就是載入入口：</p>
+
+<table>
+<tr><th>檔案</th><th>什麼時候載入</th><th>內容重點</th></tr>
+<tr><td><code>query.md</code></td><td>使用者對既有圖提問、跑 <code>/graphify path</code> 或 <code>explain</code></td><td>BFS/DFS 兩種走訪模式選擇、<code>graphify query</code> CLI 或內建 NetworkX 走訪</td></tr>
+<tr><td><code>extraction-spec.md</code></td><td>Step 3 Part B——語料有 doc/paper/image</td><td>給語意子代理的完整 JSON schema prompt（verbatim 嵌入）</td></tr>
+<tr><td><code>hooks.md</code></td><td>要裝 post-commit hook 或接 CLAUDE.md</td><td><code>graphify hook install</code> 與 CLAUDE.md 整合</td></tr>
+<tr><td><code>add-watch.md</code></td><td>跑了 <code>/graphify add</code> 或 <code>--watch</code></td><td>ingest URL、watch 資料夾</td></tr>
+<tr><td><code>update.md</code></td><td>跑了 <code>--update</code> 或 <code>--cluster-only</code></td><td><code>detect_incremental</code>、只重抽變更檔案</td></tr>
+<tr><td><code>exports.md</code></td><td>傳了 export flag（<code>--wiki</code>/<code>--neo4j</code>/<code>--svg</code>…）</td><td>各 export 步驟 + token benchmark</td></tr>
+<tr><td><code>transcribe.md</code></td><td>detect 回報有 video 檔</td><td>faster-whisper 轉錄 + god-node 領域提示</td></tr>
+<tr><td><code>github-and-merge.md</code></td><td>給了 GitHub URL 或要 merge 多個子資料夾</td><td><code>graphify clone</code>、跨 repo 合併</td></tr>
+</table>
+
+<p class="hint">有趣的事實：<code>query.md</code>（13KB）是最大的一篇，<code>extraction-spec.md</code>（8KB）其次——這兩篇裝載了「怎麼查圖」與「怎麼抽取」的核心邏輯。</p>
+
+<h2>平台差異：以 OpenCode 為例</h2>
+<p>各平台的 skill 檔幾乎相同，差異在「always-on 機制」與「安裝位置」：</p>
+<table>
+<tr><th>平台</th><th>安裝位置</th><th>always-on 機制</th></tr>
+<tr><td>OpenCode</td><td><code>~/.config/opencode/skills/graphify/SKILL.md</code>（專案：<code>.opencode/skills/…</code>）</td><td>AGENTS.md + <code>tool.execute.before</code> plugin</td></tr>
+<tr><td>Claude Code</td><td><code>~/.claude/skills/graphify/SKILL.md</code></td><td>CLAUDE.md + PreToolUse hook</td></tr>
+<tr><td>Codex</td><td><code>~/.codex/skills/…</code></td><td>AGENTS.md（hook 是刻意 no-op）</td></tr>
+<tr><td>Cursor</td><td><code>~/.cursor/skills/…</code></td><td><code>.cursor/rules/graphify.mdc</code>（alwaysApply）</td></tr>
+</table>
+<p>從 <code>install.py</code> 的 <code>PLATFORMS</code> 表可看到對應關係（如 <code>opencode: skill_file: skill-opencode.md, skill_dst: .config/opencode/skills/graphify/SKILL.md</code>）。</p>
+
+<h2>這些檔是「生出來的」</h2>
+<p>SKILL.md 與 references/ 都是 <strong>generated artifacts</strong>——真正的 source of truth 是 <code>tools/skillgen/fragments/</code>。人在 fragments 編輯，<code>python -m tools.skillgen</code> 重新渲染成各平台成品，<code>--check</code> 檢查有沒有 drift、<code>--bless</code> 更新 baseline。</p>
+<div class="callout"><strong>所以「中文化技能檔」不應該直接改 SKILL.md</strong>：那會被 skillgen 的 byte-diff 檢查打回。本站的做法是「中文講解」，而不是翻譯可安裝的 skill——翻譯會破壞產出管線的 round-trip 一致性。想深入產出機制，見 <a href="code/skillgen.html">程式碼對照 · skillgen</a>。</div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

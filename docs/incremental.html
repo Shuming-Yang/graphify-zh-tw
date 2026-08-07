@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>增量更新 + 實體去重 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>增量更新 + 實體去重</h1>
+  <div class="subtitle">「每次只處理變更的檔案」＋「把同一個概念的不同名字併成一個節點」</div>
+  <div class="badge-line">來源：<code>docs/superpowers/</code> design + plan（2026-05-04，分支 v7，issue #698）</div>
+</header>
+
+<div class="guide">
+
+<div class="callout info"><strong>這是兩份設計文件</strong>：<code>specs/…-design.md</code>（設計，本文主體）與 <code>plans/…-plan.md</code>（實作計劃，checkbox 逐步）。上游用 superpowers 的 subagent-driven-development 流程落地。</div>
+
+<h2>要解決的兩個問題</h2>
+<ol>
+<li><strong>每次重跑都全部重做</strong>：<code>graphify extract</code> 每次執行都從零重建整張圖——不管改了什麼都把全部檔案重新送 LLM。對一個每天更新的 1000 檔 markdown 語料，這很貴。</li>
+<li><strong>同實體不同名字</strong>：LLM 抽取是分塊進行，同一個真實概念在不同 chunk 可能得到不同 label（<code>AuthManager</code>、<code>AuthenticationManager</code>、<code>auth_mgr</code>）。除了精確字串正規化外，沒有語意去重。</li>
+</ol>
+
+<h2>新 Pipeline（每次 <code>graphify extract</code>）</h2>
+<pre><code>detect (full or incremental, auto-detected)
+    ↓
+AST extract (code files, AST cache-aware)
+    ↓
+Semantic LLM extract (doc/paper/image files, semantic cache-aware)
+    ↓
+build_merge (merge into existing graph, prune deleted nodes)
+    ↓
+deduplicate_entities (normalize → entropy gate → MinHash/LSH → Jaro-Winkler → community boost → optional LLM)
+    ↓
+cluster (full graph, always re-run)
+    ↓
+score_all + god_nodes + surprising_connections
+    ↓
+write graph.json + .graphify_analysis.json + manifest.json</code></pre>
+
+<h2>功能一：增量更新（Incremental Updates）</h2>
+<h3>自動偵測</h3>
+<p><code>graphify-out/manifest.json</code> + <code>graphify-out/graph.json</code> 都存在 → 進入增量模式。<strong>不需要任何 flag</strong>。第一次跑永遠是全量。</p>
+
+<h3>增量模式做了什麼</h3>
+<ul>
+<li><code>detect_incremental(target)</code> 取代 <code>detect(target)</code>，回傳 <code>new_files</code>、<code>unchanged_files</code>、<code>deleted_files</code>。</li>
+<li>只有 <code>new_files</code> 走 AST + LLM 抽取。</li>
+<li><code>build_merge(new_chunks, prune_sources=deleted_files)</code> 取代 <code>build_from_json</code>——併入既有圖、把已刪檔案的節點剪掉。</li>
+<li><code>manifest.json</code> 只在<strong>成功完成</strong>後寫入（中途當機不會弄壞下次的 diff）。</li>
+</ul>
+
+<h3>Semantic cache（全量與增量都適用）</h3>
+<ul>
+<li>呼叫 LLM 前：<code>check_semantic_cache(files)</code> 切成 <code>(cached_results, uncached_files)</code>。</li>
+<li>只有 <code>uncached_files</code> 送 <code>extract_corpus_parallel</code>。</li>
+<li>呼叫後：<code>save_semantic_cache(fresh_results)</code>，以內容雜湊為 key。</li>
+<li>檔案改名：cached result 的 <code>source_file</code> 更新到新路徑（與既有 AST cache 同模式）。</li>
+</ul>
+
+<details class="en-toggle"><summary>展開英文原文：輸出摘要範例</summary><div>
+<pre><code>[graphify extract] incremental: 20 changed, 980 cached, 2 deleted
+[graphify extract] graph: 4,821 nodes, 12,304 edges, 43 communities
+[graphify extract] tokens: 18,432 in / 6,201 out, est. cost: $0.08</code></pre>
+</div></details>
+<p class="hint">改動範圍：<code>graphify/__main__.py</code> 的 <code>elif cmd == "extract":</code> 區塊約 5 處。</p>
+
+<h2>功能二：實體去重（Entity Deduplication）</h2>
+<p>新模組 <code>graphify/dedup.py</code>，單一職責，從 <code>build.py</code> 在建圖後呼叫，回傳去重後的 <code>(nodes, edges)</code>。七個步驟：</p>
+
+<table>
+<tr><th>Step</th><th>做法</th><th>說明</th></tr>
+<tr><td>1. 精確正規化</td><td>接上 <code>build.py</code> 的既有 <code>deduplicate_by_label</code></td><td>抓跨檔案的 case/標點變體。免費，本來就寫好了。</td></tr>
+<tr><td>2. 熵門檻</td><td>entropy &lt; 2.5 bits/char 的 label 跳過模糊比對</td><td>短歧義名（<code>AI</code>、<code>DB</code>、<code>x</code>）太危險，不自動合併。只有高熵 label 進下一步。</td></tr>
+<tr><td>3. MinHash + LSH blocking</td><td><code>datasketch</code>，3-gram、128 排列、threshold 0.7</td><td>候選對用 O(n) 產生（而非 O(n²)）。1 萬節點 < 1 秒。</td></tr>
+<tr><td>4. Jaro-Winkler 驗證</td><td><code>rapidfuzz</code>，≥ 0.92</td><td>抓錯字、複數、空格變體。低於門檻的對丟棄。</td></tr>
+<tr><td>5. 同社群加分</td><td>兩個節點共享 Leiden community ID 加 +0.05</td><td>Graphify 特有優勢——社群結構是 GraphRAG/LightRAG 沒用的強訊號。</td></tr>
+<tr><td>6. Union-find 合併</td><td>確認的對餵進 union-find → 連通分量 → 每個分量合併成一節點</td><td>邊重新指向生還者；自環丟棄；偏好較短、非 chunk 後綴的 ID 當生還者。</td></tr>
+<tr><td>7. 可選 LLM 仲裁</td><td><code>--dedup-llm</code> flag</td><td>歧義對（0.75–0.85）每 30 個一批、每批一次 LLM 呼叫；1 萬節點約 $0.01。預設關閉。</td></tr>
+</table>
+
+<h3>整合點</h3>
+<p>去重在 <code>build_merge</code>/<code>build_from_json</code> 之後、<code>cluster</code> 之前執行。順序很重要：<strong>圖越乾淨，社群偵測越好</strong>。</p>
+<pre><code># in build.py
+G = build_merge(...)          # or build_from_json
+G = deduplicate_entities(G)   # new step
+communities = cluster(G)      # unchanged</code></pre>
+
+<h3>新相依套件</h3>
+<ul>
+<li><code>datasketch</code> — 必裝（加入 <code>[project.dependencies]</code>）</li>
+<li><code>rapidfuzz</code> — 必裝（加入 <code>[project.dependencies]</code>）</li>
+<li><strong>不需要</strong> sentence-transformers / PyTorch</li>
+</ul>
+
+<h2>測試計劃</h2>
+<ul>
+<li>去重每個步驟的獨立單元測試（<code>tests/test_dedup.py</code>）。</li>
+<li>整合測試：兩個 label 重疊的 chunk → 輸出圖中單一合併節點。</li>
+<li>增量測試：跑兩次 extract，第二次對未變檔案零 LLM 呼叫。</li>
+<li>改名測試：改名檔案 → cache hit 且 <code>source_file</code> 正確更新。</li>
+<li>刪除測試：刪檔案 → 節點從圖中剪除。</li>
+</ul>
+
+<h2>Non-goals（刻意不做）</h2>
+<ul>
+<li><code>--dedup embed</code>（MiniLM cosine）——明確排除，不引入 PyTorch 相依。</li>
+<li>增量支援 <code>graphify update</code>（AST-only）——既有 AST cache 已處理。</li>
+<li>跨 graph.json 去重（合併兩張圖）——獨立功能。</li>
+</ul>
+
+<div class="callout"><strong>教學價值</strong>：這份設計是「大型開源專案怎麼把工程計劃寫成可稽核文件」的範例——問題 → pipeline → 每步參數與理由 → 整合點 → 測試 → non-goals。而且它已經落地：<code>cache.py</code>（semantic cache）、<code>dedup.py</code>（七步去重）、<code>build_merge</code> 都在 <a href="code/ops.html">程式碼對照 · ops</a> 裡能對到實作。</div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

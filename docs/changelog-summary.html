@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>版本演進摘要 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>版本演進摘要</h1>
+  <div class="subtitle">CHANGELOG 1709 行的精簡導覽——只看里程碑，不逐字翻</div>
+  <div class="badge-line">來源：<code>CHANGELOG.md</code>（0.1.0 → 0.9.34）· 本站對齊 v8 @ 9f25a3a</div>
+</header>
+
+<div class="guide">
+
+<h2>發展節奏</h2>
+<p>Graphify 從 2026-04-03 的 <code>0.1.0</code> 到 2026-08-05 的 <code>0.9.34</code>，約四個月出了 100+ 個版本。早期每天多版，中期轉為穩定修 bug。這頁只挑「改變產品方向的里程碑」。</p>
+
+<h2>里程碑時間軸</h2>
+<div class="guide">
+<ol class="timeline">
+<li><span class="t-stage">0.1.0（2026-04-03）— 誕生</span>最初版本就有完整骨架：13 語言 tree-sitter AST 抽取（Python、JS、TS、Go、Rust、Java、C、C++、Ruby、C#、Kotlin、Scala、PHP）、Leiden 社群偵測、SHA256 語意快取、MCP stdio server（<code>query_graph</code>/<code>get_node</code>/<code>shortest_path</code>/<code>god_nodes</code>）、記憶回饋迴路。</li>
+<li><span class="t-stage">0.2.2（2026-04-06）— 開始整合開發工作流</span>加入 <code>graphify claude install</code>（CLAUDE.md + PreToolUse hook）、git hook（post-commit/post-checkout）、benchmark 指令。</li>
+<li><span class="t-stage">0.3.0（2026-04-06）— 多平台化</span>支援 Codex、OpenCode、OpenClaw；<code>install --platform</code> 路由到各平台設定目錄；加 MIT license。也是這版把 <code>extract.py</code> 從 2527 行瘦身到 1588 行（用 <code>LanguageConfig</code> dataclass 取代 12 份複製貼上的語言抽取器）。</li>
+<li><span class="t-stage">0.4.0（2026-04-10）— v4：影音時代</span>支援影片/音訊語料（faster-whisper 本機轉錄）、YouTube/URL 下載（yt-dlp）、領域感知 Whisper prompt、transcripts 快取。</li>
+<li><span class="t-stage">0.5.0（2026-04-24）— 跨 repo 與安全更新</span><code>graphify clone</code>、<code>merge-graphs</code>、shrink guard（不讓更小的圖覆蓋）、<code>build_merge()</code> 安全增量更新、<code>deduplicate_by_label()</code>。</li>
+<li><span class="t-stage">0.6.0（2026-05-01）— SQL 時代</span>SQL AST 抽取器（tables、views、FK、FROM/JOIN <code>reads_from</code> 邊），xlsx 結構抽取。</li>
+<li><span class="t-stage">0.7.0（2026-05-03）— 多人開發支援</span>git merge driver（graph.json 自動 union-merge，不再衝突）、Leiden seed=42 確定性分群、<code>built_at_commit</code> 嵌入、內容式 file hash（改名沿用快取）。</li>
+<li><span class="t-stage">0.8.x（2026-05~06）— 品質與擴充</span>FalkorDB export、ghost duplicate 自動合併、內建型別註解雜訊過濾、自訂 OpenAI/Anthropic 相容端點、PowerShell 模組、Swift import 修復、runbook 崩潰修復等。</li>
+<li><span class="t-stage">0.9.0（2026-06-28）— Breaking：節點 ID 全面重造</span>節點 ID 改含完整 repo-relative 路徑（<code>docs_v1_api_readme</code> vs <code>docs_v2_api_readme</code>），修掉「不同目錄同名檔被併成一個節點」的資料流失問題。既有圖下次 build/update 自動遷移。</li>
+<li><span class="t-stage">0.9.x（2026-07~08）— 持續修復</span>C# partial class、path 邊方向、hyperedge、incremental 跨檔呼叫保留等精密修復；目前最新 0.9.34（2026-08-05）。</li>
+</ol>
+</div>
+
+<h2>主線趨勢</h2>
+<table>
+<tr><th>維度</th><th>演進</th></tr>
+<tr><td>語言支援</td><td>13 種 → 36 種 tree-sitter 文法（含 SQL、Terraform、Pascal、DM…）+ Apex regex 抽取</td></tr>
+<tr><td>輸入類型</td><td>程式碼 → +文件/PDF → +影音/YouTube → +SQL/Office/Google Workspace</td></tr>
+<tr><td>平台</td><td>Claude Code → Codex/OpenCode/OpenClaw → 20+ 平台</td></tr>
+<tr><td>團隊工作流</td><td>個人工具 → merge driver、確定性分群、built_at_commit（多人協作）</td></tr>
+<tr><td>工程品質</td><td>extract.py 2500+ 行 → LanguageConfig 抽象；效能修復（遞迴→迭代、平行化）；ghost 合併</td></tr>
+<tr><td>透明度</td><td>信任標籤（EXTRACTED/INFERRED/AMBIGUOUS）始終如一，愈來愈嚴格</td></tr>
+</table>
+
+<h2>看完整記錄</h2>
+<p>這頁只是摘要。完整的 1709 行 CHANGELOG 在上游 repo 的 <a href="https://github.com/Graphify-Labs/graphify/blob/v8/CHANGELOG.md"><code>CHANGELOG.md</code></a>——每個版本都有詳細的 issue 編號與 contributor 感謝。</p>
+
+<div class="callout info"><strong>教學角度</strong>：這份 CHANGELOG 是很好的「開源專案成長史」教材——看它怎麼從單一平台的個人工具，演進到多平台、多語料、多人協作的產品。特別值得注意 0.9.0 的 breaking change：<strong>節點 ID 是資料</strong>，改 ID 格式會影響所有下游（Neo4j、GraphML、MCP）。</div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

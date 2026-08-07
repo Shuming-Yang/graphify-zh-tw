@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文件教學 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="../index.html">← 回首頁</a></div>
+<header>
+  <h1>文件教學</h1>
+  <div class="subtitle">Graphify 官方文件的中文講解——中文解說為主文，英文原文可展開對照</div>
+</header>
+
+<div class="guide">
+<p>這區涵蓋 repo 根目錄與 <code>docs/</code> 資料夾的官方文件。每一頁都是「中文口語講解 + 可展開的英文原文」，保留上游的原意與命令。</p>
+
+<h2>核心文件</h2>
+<div class="card-grid">
+  <a class="card" href="how-it-works.html">
+    <span class="c-name">運作原理 · How it works</span>
+    <span class="c-zh">三遍處理（AST / 影音 / 語意）、Leiden 社群偵測、信任標籤、token 基準、SHA256 快取、圖格式。<br>來源：<code>docs/how-it-works.md</code></span>
+  </a>
+  <a class="card" href="architecture.html">
+    <span class="c-name">架構總覽 · Architecture</span>
+    <span class="c-zh">七階段 pipeline、14 個模組職責表、抽取 schema、信任標籤、如何新增一個語言抽取器、安全入口。<br>來源：<code>ARCHITECTURE.md</code> + <code>AGENTS.md</code></span>
+  </a>
+  <a class="card" href="benchmarks.html">
+    <span class="c-name">效能基準 · Benchmarks</span>
+    <span class="c-zh">LOCOMO / LongMemEval-S / ERPNext 的測量結果、零 LLM 成本建圖、裁判驗證、重現指令。<br>來源：<code>BENCHMARKS.md</code></span>
+  </a>
+  <a class="card" href="security.html">
+    <span class="c-name">安全模型 · Security</span>
+    <span class="c-zh">威脅面逐條解析（SSRF、路徑穿越、XSS、prompt injection…）、graphify 不做什麼、可選網路呼叫。<br>來源：<code>SECURITY.md</code></span>
+  </a>
+</div>
+
+<h2>docs/ 資料夾</h2>
+<div class="card-grid">
+  <a class="card" href="incremental.html">
+    <span class="c-name">增量更新 + 實體去重</span>
+    <span class="c-zh">semantic cache、manifest 增量偵測、build_merge、MinHash/LSH + Jaro-Winkler 去重設計與實作計劃。<br>來源：<code>docs/superpowers/</code> design + plan</span>
+  </a>
+  <a class="card" href="node-summaries-rfc.html">
+    <span class="c-name">RFC：檔案級節點摘要</span>
+    <span class="c-zh">要不要替每個檔案節點加一句摘要？Option A（放 graph.json）vs Option B（sidecar）的設計比較。<br>來源：<code>docs/node-summaries-rfc.md</code></span>
+  </a>
+  <a class="card" href="docker-mcp-sqlite.html">
+    <span class="c-name">Docker MCP + SQLite</span>
+    <span class="c-zh">把 SQLite MCP server 裝進 Docker MCP Toolkit 的完整 runbook——安裝、冒煙測試、儲存、解除、疑難排解。<br>來源：<code>docs/docker-mcp-sqlite.md</code></span>
+  </a>
+</div>
+
+<h2>技能檔案</h2>
+<div class="card-grid">
+  <a class="card" href="skill-files.html">
+    <span class="c-name">技能檔結構拆解</span>
+    <span class="c-zh">SKILL.md 的前置資料、references/ 側車、OpenCode 平台 8 篇參考檔逐篇講解，以及 skillgen 如何產出這些檔。<br>來源：<code>graphify/skill*.md</code> + <code>graphify/skills/opencode/references/</code></span>
+  </a>
+  <a class="card" href="changelog-summary.html">
+    <span class="c-name">版本演進摘要</span>
+    <span class="c-zh">CHANGELOG 361KB 的精簡導覽——只看重要版本做了什麼，不逐字翻。<br>來源：<code>CHANGELOG.md</code></span>
+  </a>
+</div>
+
+<h2>與程式碼的對應</h2>
+<p class="hint">想直接讀 source 的話，<a href="code/index.html">程式碼對照</a> 區以「每函數一個收縮塊」的方式，逐函數講解 <code>/graphify</code> 主程式、<code>/tools</code>、<code>/scripts</code> 與 <code>/tests</code>。</p>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RFC：檔案級節點摘要 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>RFC：檔案級節點摘要</h1>
+  <div class="subtitle">要不要替每個檔案節點加「一句話摘要」？——Option A 放圖裡 vs Option B 放 sidecar</div>
+  <div class="badge-line">來源：<code>docs/node-summaries-rfc.md</code></div>
+</header>
+
+<div class="guide">
+
+<h2>問題</h2>
+<p><code>graph.json</code> 給了代理圖的結構、原始檔、節點 label 與關係。這能避免讀整個 repo，但代理常常還是得打開原始檔，只為了回答一個最基本的導覽問題：</p>
+<blockquote>這個檔案／節點是負責做什麼的？</blockquote>
+<p>一個放在圖節點附近的短摘要，可以減少 <code>graphify query</code>、<code>graphify explain</code>、MCP 節點查詢與圖導覽時的重複讀檔。</p>
+
+<h2>目標與 Non-goals</h2>
+<div class="pair">
+<div class="col-en">
+<pre><code>Goals:
+- Help agents choose relevant files with less context.
+- Preserve offline, deterministic behavior by default.
+- Keep the first implementation small and reviewable.
+- Avoid adding long prose to GRAPH_REPORT.md.
+- Leave room for a future opt-in LLM summary backend.
+
+Non-goals:
+- Summarizing every function/method in v1.
+- Calling an LLM by default.
+- Replacing graphify explain.
+- Turning GRAPH_REPORT.md into a per-file index.</code></pre>
+</div>
+<div class="col-zh">
+<p><strong>目標</strong>：讓代理用更少 context 選對檔案；預設保持離線與確定性；第一版小而可稽核；不把長文塞進 GRAPH_REPORT.md；留給未來可選的 LLM 摘要後端。</p>
+<p><strong>刻意不做</strong>：第一版不摘要每個函數/方法；預設不呼叫 LLM；不取代 explain；不把報告變成逐檔索引。</p>
+</div>
+</div>
+
+<h2>兩種方案的共同約束</h2>
+<ul>
+<li>第一版只做檔案級節點。</li>
+<li>每條摘要要有界：一句話、約 200–300 字元。</li>
+<li>先從既有本機訊號產生確定性摘要：模組 docstring、檔頭註解、匯出符號、import、關係數、社群/脈絡資料。</li>
+<li>儲存模型定案前，預設不輸出摘要。</li>
+<li>有摘要時在 <code>graphify explain &lt;node&gt;</code> 顯示。</li>
+<li>有摘要時在 <code>graphify serve</code> / MCP 節點查詢包含。</li>
+</ul>
+
+<h2>摘要該含什麼</h2>
+<p>建議欄位：<code>summary</code>（一句話描述檔案職責，主要省 token 欄位）、<code>source_file</code>（不需解析節點 ID 就能跳到對的檔）、<code>label</code>、<code>generated_by</code>（區分確定性與未來的 LLM 摘要）、<code>summary_version</code>（格式可演進）。</p>
+<p>建議納入句子內的訊號：模組 docstring / 檔頭註解（通常是最優質的人工目的陳述）、匯出類別/函數/符號（檔案提供什麼 API 面）、重要 import（屬 auth/DB/UI/CLI/test）、主導圖關係（主要呼叫/匯入/定義）、社群或附近 hub label、可用的來源位置覆蓋。不含長呼叫鏈、完整相依清單、原始碼、每個符號。</p>
+
+<details class="en-toggle"><summary>展開英文原文：範例摘要</summary><div>
+<pre><code>{
+  "label": "extract.py",
+  "source_file": "graphify/extract.py",
+  "summary": "Extracts source files into graph nodes and relationships; defines language parsers and import/call extraction helpers.",
+  "generated_by": "deterministic",
+  "summary_version": 1
+}</code></pre>
+</div></details>
+
+<h2>Option A：摘要放進 <code>graph.json</code></h2>
+<p>在檔案級節點加一個可選 <code>summary</code> 欄位。使用者流程：<code>graphify . --summarize-nodes</code> → <code>graphify explain "extract.py"</code>。</p>
+<p><strong>優點</strong>：圖消費者單一 artifact；符合 NetworkX 節點屬性與既有節點 metadata；<code>explain</code>/<code>serve</code>/視覺化/MCP 都好取用；沒有 sidecar 新鮮度或節點 ID 對接邏輯。</p>
+<p><strong>缺點</strong>：文字加進核心圖 artifact；圖 schema 面變大；把整個 graph.json 倒進 LLM context 的消費者會一次付出所有摘要的 token。</p>
+
+<h2>Option B：sidecar <code>node-summaries.json</code></h2>
+<p>摘要寫進另一個以節點 ID 為 key 的 artifact。使用者流程：<code>graphify summarize</code> → <code>graphify explain "extract.py"</code>。</p>
+<p><strong>優點</strong>：graph.json 保持精簡與拓撲聚焦；摘要明確可選；可獨立重新產生；有放未來 generator metadata 的自然位置。</p>
+<p><strong>缺點</strong>：多了消費者必須發現並載入的第二個 artifact；引入新鮮度與同步問題；每個想用摘要的消費者都要靠節點 ID 對接。</p>
+
+<div class="callout"><strong>選型的核心張力</strong>：單一 artifact 的簡潔 vs 核心圖的精簡。這正是 RFC 存在的意義——把取捨講清楚，讓維護者與使用者投票。作者列的 4 個待決問題：<code>graph.json</code> 單一 artifact 還是 sidecar？摘要在建圖時產生還是要顯式指令（如 <code>graphify summarize</code>）？叫 <code>summary</code> 還是 <code>synopsis</code>？多大預算可接受？</div>
+
+<h2>提議的首版實作順序</h2>
+<ol>
+<li>加確定性檔案級摘要產生。</li>
+<li>用選定的 option 儲存摘要。</li>
+<li>在 <code>graphify explain</code> 顯示摘要。</li>
+<li>在 <code>graphify serve</code> / MCP 節點查詢顯示。</li>
+<li>加測試：預設行為、產生的摘要、缺摘要、摘要長度上限。</li>
+</ol>
+
+<h2>後續想法</h2>
+<ul>
+<li>可選的 LLM 生成摘要，帶明確 provider/backend 選擇。</li>
+<li>若檔案級摘要被證實有用，擴展到 class / module 級節點。</li>
+<li>允許 <code>graphify query</code> 在預算內為回傳節點包含摘要。</li>
+<li>若摘要與主圖分開產生，加 cache/新鮮度 metadata。</li>
+</ul>
+
+<p class="hint">教學延伸：這份 RFC 展示了 Graphify 團隊怎麼為「AI 代理導覽」設計介面——而實際的檔案摘要概念已部分體現在「本站怎麼挑要教哪個檔案」的策展邏輯上。想讀 graph.json 的實際 schema，看 <a href="../map.html">概念地圖</a> 或 <a href="worked.html">實作案例</a>。</p>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>
