@@ -2,3 +2,6 @@
 .DS_Store
 *.local
 graphify-out/
+
+# playwright test artifacts
+.playwright-mcp/
