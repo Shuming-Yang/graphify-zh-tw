@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>程式碼對照 · export + exporters · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>export + exporters：圖 → 檔案</h1>
+  <div class="subtitle">graph.json / graph.html / Obsidian vault / SVG / callflow HTML 是怎麼生成的</div>
+  <div class="badge-line">檔案：<code>export.py</code> · <code>exporters/html.py</code> · <code>tree_html.py</code> · <code>callflow_html.py</code></div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p><code>export.py</code> 是 pipeline 的最後一站，把 NetworkX 圖變成各種檔案。最有名的是三個：<code>graph.json</code>（給查詢與其他工具）、<code>GRAPH_REPORT.md</code>（report.py 生成）、<code>graph.html</code>（互動視覺化）。本站 <a href="../worked.html">實作案例</a> 的互動圖就是這個 exporter 的產物。</p>
+
+<hr>
+
+<h2>1. export.py — 主輸出</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">to_json(G, communities, output_path, *, force, …)</span> <span class="fn-sig">→ bool</span> <span class="fn-tag">export.py:232</span><span class="fn-one-liner">寫出 graph.json——但先做「拒絕縮小」的防護。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p><code>to_json</code> 是 graphify 最重視資料安全的地方：</p>
+<ol>
+<li><strong>Shrink guard</strong>（issue #479 的核心）：如果既有 <code>graph.json</code> 存在且新圖節點數更少，<strong>拒絕覆寫</strong>。因為「新圖比較小」通常代表前一次 session 的 chunk 檔遺失、或 fuzzy dedup 誤併。讀不到既有檔（corrupt）時也 fail-safe——寧可不寫，也不讓局部重建覆蓋掉好的圖。</li>
+<li><strong>寫入節點中繼</strong>：每個節點補上 <code>community</code>、<code>community_name</code>、<code>norm_label</code>（去掉重音符號的小寫 label，供檢索）。</li>
+<li><strong>邊方向還原</strong>：無向 NetworkX 儲存可能把 <code>calls</code> 等有向邊的端點順序搞反，build 時在 <code>_src</code>/<code>_tgt</code> 藏了真實端點，這裡還原（issue #563）。</li>
+<li><strong>超邊防護</strong>：圖沒有 hyperedges key 但磁碟上的舊檔有——印出清楚警告（issue #2485）。</li>
+<li><strong>Atomic write</strong>：<code>write_json_atomic()</code> 原子寫入——中途當機不會截斷好的 graph.json。</li>
+</ol>
+<div class="anno-para"><strong>教學重點</strong>：「寫一個 JSON」這個平凡動作，這裡的工程密度非常高——shrink guard、方向還原、超邊防護、原子寫。資料安全是這個函數的第一要務。</div>
+</div>
+<div class="src-block">
+<div class="src-line"><span class="ln">235</span><span class="code">    <span class="hl">if not force and existing_path.exists():</span></span></div>
+<div class="src-line"><span class="ln">275</span><span class="code">        <span class="hl">if new_n &lt; existing_n:</span> <span class="hl"># 新圖更小 → 拒絕</span></span></div>
+<div class="src-line"><span class="ln">287</span><span class="code">            <span class="hl">return False</span></span></div>
+<div class="src-line"><span class="ln">296</span><span class="code">        node["community"] = cid</span></div>
+<div class="src-line"><span class="ln">309</span><span class="code">        <span class="hl">true_src = link.pop("_src", None)</span> <span class="hl"># 還原真實方向</span></span></div>
+<div class="src-line"><span class="ln">348</span><span class="code">    <span class="hl">write_json_atomic(output_path, data, indent=2)</span> <span class="hl"># 原子寫入</span></div>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">to_obsidian(G, …)</span> <span class="fn-sig">→ Path</span> <span class="fn-tag">export.py:513</span><span class="fn-one-liner">把圖輸出成 Obsidian vault（每社群一篇 + wikilinks）。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：<code>--obsidian</code> flag 的實作。為每個社群產生一篇 <code>_COMMUNITY_&lt;name&gt;.md</code>，節點之間用 Obsidian wikilink（<code>[[…]]</code>）互連——這樣你在 Obsidian 的 graph view 直接看到整個知識圖譜。檔名用 <code>_obsidian_safe_stem</code> 安全化、<code>_dedup_node_filenames</code> 避免同名檔衝突、frontmatter 用 <code>_yaml_str</code> 防注入（與 <a href="ops.html">security</a> 對應）。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">to_cypher · to_graphml · to_svg · to_canvas</span> <span class="fn-tag">export.py 各處</span><span class="fn-one-liner">其他輸出格式。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：</p>
+<ul>
+<li><code>to_cypher(G, path)</code> — 產生 <code>cypher.txt</code>（Neo4j / FalkorDB 匯入），<code>_cypher_escape</code> / <code>_cypher_label</code> 處理 Cypher 字串與 label 安全。</li>
+<li><code>to_graphml(G, path)</code> — 輸出 GraphML（Gephi / yEd）。</li>
+<li><code>to_svg(G, path)</code> — SVG 圖（Notion / GitHub 內嵌）。</li>
+<li><code>to_canvas(G, …)</code> — Obsidian Canvas 輸出。</li>
+<li><code>backup_if_protected(out_dir)</code> — 目標目錄受保護時先備份。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<hr>
+
+<h2>2. exporters/html.py — 互動圖 graph.html</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">to_html(nodes, edges, communities, output_path, …)</span> <span class="fn-sig">→ Path</span> <span class="fn-tag">exporters/html.py:325</span><span class="fn-one-liner">產出單一檔案的互動圖：內嵌節點/邊/圖例 JSON + vis-network JS。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>這就是本站 <a href="../worked.html">實作案例</a> 互動圖的生成器。輸出是<strong>單一自含 HTML</strong>：</p>
+<ul>
+<li><strong>資料內嵌</strong>：節點（含顏色、大小、community）、邊、圖例各自序列化成 JS 常量（<code>RAW_NODES</code> / <code>RAW_EDGES</code> / <code>LEGEND</code>）寫進 <code>&lt;script&gt;</code>。</li>
+<li><strong>視覺化</strong>：用 <code>vis-network</code>（unpkg CDN）以 forceAtlas2Based 物理引擎畫力導向圖。</li>
+<li><strong>側欄</strong>：搜尋、節點資訊（type / community / source / degree / neighbors）、社群圖例（可勾選隱藏）。</li>
+<li><strong>超邊疊加</strong>：<code>_hyperedge_script</code> 在 canvas afterDrawing 時畫半透明群組區域。</li>
+<li><strong>HTML-escape</strong>：節點 label 都經過 <code>esc()</code> 才進 innerHTML——這呼應 <a href="../security.html">SECURITY.md</a> 的 XSS 緩解。</li>
+</ul>
+<div class="anno-para"><strong>教學重點</strong>：這個 exporter 是「怎麼把 NetworkX 圖變成可互動 web 應用」的完整範例——資料序列化、渲染、UI、安全 escape，全部塞進一個 <code>&lt;details&gt;</code> 都能理解的單一檔案。本站的 <code>graph-zh.html</code> 就是對它的產物做 UI 字串中文化。</div>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_html_styles · _html_script · _viz_node_limit · _hyperedge_script</span> <span class="fn-tag">exporters/html.py 各處</span><span class="fn-one-liner">HTML 的零件。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：</p>
+<ul>
+<li><code>_html_styles()</code> — 回傳內嵌 CSS 字串（深色主題、側欄、圖例）。</li>
+<li><code>_html_script(nodes_json, edges_json, legend_json)</code> — 組出全部渲染 JS（dataset 建立、network 選項、搜尋、點選、圖例互動）。</li>
+<li><code>_viz_node_limit()</code> — 節點上限防護（超過就不生成 HTML，避免瀏覽器開不動）。</li>
+<li><code>_hyperedge_script(hyperedges_json)</code> — 超邊的 canvas 疊加渲染。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<hr>
+
+<h2>3. tree_html.py — 檔案樹圖</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">build_tree · emit_html · write_tree_html</span> <span class="fn-tag">tree_html.py</span><span class="fn-one-liner">把目錄結構畫成互動樹狀圖。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：<code>build_tree(paths)</code> 把檔案路徑清單組成一棵樹（<code>_common_root</code> 找出共同根、<code>_make_truncation_leaf</code> 處理過多子節點），<code>emit_html</code> / <code>write_tree_html</code> 渲染成自含 HTML。這讓瀏覽者先看到專案結構，再進圖。</p>
+</div>
+</div>
+</details>
+
+<hr>
+
+<h2>4. callflow_html.py — 架構/呼叫流圖</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">load_graph · normalize_node · write_callflow_html …</span> <span class="fn-tag">callflow_html.py</span><span class="fn-one-liner">從 graphify-out 產生 Mermaid 架構圖與呼叫流 HTML。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：<code>graphify export callflow-html</code> 的實作。讀取圖資料（<code>load_graph</code>），把節點/邊正規化成統一形狀（<code>normalize_node</code> / <code>normalize_edge</code>），最後渲染成含 <a href="https://mermaid.js.org">Mermaid</a> 圖的 HTML。裝了 hook 時，每次 git commit 都會自動重新生成。</p>
+</div>
+</div>
+</details>
+
+<div class="callout"><strong>看完這頁你應該能說出</strong>：graph.json 為什麼拒絕「更小的覆寫」、graph.html 是怎麼做到單檔自含的、Obsidian vault 的 wikilink 從哪來。接著讀 <a href="ops.html">ops 維運與安全</a> 看 cache/dedup/serve 等服務模組。</div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>程式碼對照 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="../../index.html">← 回首頁</a></div>
+<header>
+  <h1>程式碼對照</h1>
+  <div class="subtitle">/graphify 主程式、/tools、/scripts、/tests 逐函數講解——中文解說配英文原始碼</div>
+</header>
+
+<div class="guide">
+<p>這區是本站最深的章節。每個函數一個<strong>預設收縮的 <code>&lt;details&gt;</code> 塊</strong>：點開看 signature + 中文講解，核心函數附逐行註解。行數很短的工具函數則用段落式說明帶過。</p>
+
+<div class="callout info"><strong>怎麼讀</strong>：先從 <a href="pipeline.html">主線 pipeline</a> 開始——那是 <code>detect → extract → build → cluster</code> 的資料流主幹。看懂後再往 <a href="analysis.html">分析與報告</a>、<a href="export.html">輸出</a>、<a href="ops.html">維運與安全</a> 延伸。語言抽取器放 <a href="extractors.html">extractors</a> 專頁。</div>
+
+<h2>主線 pipeline</h2>
+<div class="card-grid">
+  <a class="card" href="pipeline.html">
+    <span class="c-name">detect + extract + build + cluster</span>
+    <span class="c-zh">收集檔案 → tree-sitter AST 抽取 → 併入 NetworkX 圖 → Leiden 社群偵測。<br>檔案：<code>detect.py</code>（1996 行）· <code>extract.py</code>（5993 行）· <code>build.py</code>（1943 行）· <code>cluster.py</code>（320 行）</span>
+  </a>
+  <a class="card" href="extractors.html">
+    <span class="c-name">extractors/ 語言抽取器</span>
+    <span class="c-zh">extractor 骨架：models / engine / resolution / registry，加語言抽取的共通模式。<br>檔案：<code>graphify/extractors/</code></span>
+  </a>
+</div>
+
+<h2>分析與輸出</h2>
+<div class="card-grid">
+  <a class="card" href="analysis.html">
+    <span class="c-name">analyze + report</span>
+    <span class="c-zh">god nodes、surprising connections、suggested questions，以及 GRAPH_REPORT.md 的生成。<br>檔案：<code>analyze.py</code>（749 行）· <code>report.py</code>（300 行）</span>
+  </a>
+  <a class="card" href="export.html">
+    <span class="c-name">export + exporters</span>
+    <span class="c-zh">圖 → graph.json / graph.html / Obsidian vault / SVG / callflow HTML。<br>檔案：<code>export.py</code> · <code>exporters/html.py</code> · <code>tree_html.py</code> · <code>callflow_html.py</code></span>
+  </a>
+</div>
+
+<h2>指令層與維運</h2>
+<div class="card-grid">
+  <a class="card" href="cli.html">
+    <span class="c-name">cli.py 指令層</span>
+    <span class="c-zh">所有 subcommand 的入口——install / extract / query / path / explain / serve / watch…<br>檔案：<code>cli.py</code>（~5000 行）· <code>__main__.py</code></span>
+  </a>
+  <a class="card" href="ops.html">
+    <span class="c-name">ops 維運與安全</span>
+    <span class="c-zh">cache / dedup / ingest / watch / serve / security / validate。<br>檔案：<code>cache.py</code> · <code>dedup.py</code> · <code>ingest.py</code> · <code>watch.py</code> · <code>serve.py</code> · <code>security.py</code> · <code>validate.py</code></span>
+  </a>
+</div>
+
+<h2>工具 / 腳本 / 測試</h2>
+<div class="card-grid">
+  <a class="card" href="skillgen.html">
+    <span class="c-name">skillgen + gen-demo-path</span>
+    <span class="c-zh">技能檔怎麼從 fragments 產出（platforms.toml + 模板渲染 + expected/ 校驗），與 README 首圖 SVG 的動畫生成器。<br>檔案：<code>tools/skillgen/</code> · <code>scripts/gen_demo_path.py</code></span>
+  </a>
+  <a class="card" href="tests.html">
+    <span class="c-name">tests 測試策略</span>
+    <span class="c-zh">140 個測試檔 + fixtures 設計——30+ 語言各一份 sample.*，怎麼測跨語言解析。<br>檔案：<code>tests/</code> + <code>tests/fixtures/</code></span>
+  </a>
+</div>
+
+<p class="hint">對照指南：每頁頂部標示對應的原始檔與行數。程式碼引用自 Apache-2.0 上游，僅用於教學。</p>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

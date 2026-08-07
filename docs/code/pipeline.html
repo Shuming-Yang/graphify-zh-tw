@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>程式碼對照 · 主線 pipeline · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>主線 pipeline：detect → extract → build → cluster</h1>
+  <div class="subtitle">資料流主幹逐函數講解</div>
+  <div class="badge-line">檔案：<code>detect.py</code>（1996 行）· <code>extract.py</code>（5993 行）· <code>build.py</code>（1943 行）· <code>cluster.py</code>（320 行）</div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p>這四支模組就是「把檔案變成圖」的資料流：<code>detect</code> 找出有哪些檔案 → <code>extract</code> 把每個檔案抽成 <code>{nodes, edges}</code> → <code>build</code> 併成一張 NetworkX 圖 → <code>cluster</code> 用 Leiden 把節點分成社群。每一步的介面都很乾淨：dict 進、dict 出，只在 <code>graphify-out/</code> 寫檔。</p>
+
+<hr>
+
+<h2>1. detect.py — 收集與分類檔案</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">classify_file(path)</span> <span class="fn-sig">Path → FileType | None</span> <span class="fn-tag">detect.py:491</span><span class="fn-one-liner">決定一個檔案的「類型」：程式碼、文件、論文、圖片、影片，或無法定義。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>這是整個管線的「分類開關」。它依序檢查、<strong>先比對特殊情況、再比對副檔名</strong>：</p>
+<ul>
+<li><strong>套件 manifest 優先</strong>：<code>pyproject.toml</code>、<code>go.mod</code>、<code>pom.xml</code> 等被導向 <code>CODE</code>（用確定性的 manifest 解析，而不是丟給 LLM）——否則一個 <code>apm.yml</code> 會被當成「文件」送 LLM，把套件拆成重複節點。</li>
+<li><strong>複合副檔名先查</strong>：<code>.blade.php</code> 要在查 <code>.php</code> 之前判斷。</li>
+<li>接著依序查 <code>CODE_EXTENSIONS</code>、<code>PAPER_EXTENSIONS</code>（PDF 在 Xcode asset catalog 裡是向量圖示，要排除）、<code>IMAGE_EXTENSIONS</code>、<code>DOC_EXTENSIONS</code>（再檢查是否長得像論文）、office、Google Workspace、video。</li>
+<li>無副檔名時退回 <code>_shebang_file_type()</code>（<code>#!/usr/bin/env bash</code> 的 CLI 也是程式碼）。</li>
+</ul>
+<p class="hint">這就是「程式碼零 LLM、文件要 LLM」的源頭——類型決定後，走哪條抽取路徑就定了。</p>
+</div>
+<div class="src-block">
+<div class="src-line"><span class="ln">491</span><span class="code"><span class="hl">def classify_file</span>(path: Path) -> FileType | None:</span></div>
+<div class="src-line"><span class="ln">496</span><span class="code">    <span class="hl">from graphify.manifest_ingest import is_package_manifest_path</span></span></div>
+<div class="src-line"><span class="ln">497</span><span class="code">    <span class="hl">if is_package_manifest_path(path):</span></span></div>
+<div class="src-line"><span class="ln">498</span><span class="code">        <span class="hl">return FileType.CODE</span>   <span class="hl"># 套件 manifest 走確定性解析</span></span></div>
+<div class="src-line"><span class="ln">500</span><span class="code">    <span class="hl">if path.name.lower().endswith(".blade.php"):</span></span></div>
+<div class="src-line"><span class="ln">501</span><span class="code">        <span class="hl">return FileType.CODE</span>   <span class="hl"># 複合副檔名先比</span></span></div>
+<div class="src-line"><span class="ln">505</span><span class="code">    <span class="hl">if ext in CODE_EXTENSIONS:</span> <span class="hl">return FileType.CODE</span></span></div>
+<div class="src-line"><span class="ln">512</span><span class="code">    <span class="hl">if ext in IMAGE_EXTENSIONS:</span> <span class="hl">return FileType.IMAGE</span></span></div>
+<div class="src-line"><span class="ln">523</span><span class="code">    <span class="hl">if ext in VIDEO_EXTENSIONS:</span> <span class="hl">return FileType.VIDEO</span></span></div>
+<div class="src-line"><span class="ln">525</span><span class="code">    <span class="hl">return None</span>   <span class="hl"># 無副檔名 → 靠 shebang 判斷</span></span></div>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">detect(root, *, follow_symlinks, …)</span> <span class="fn-sig">Path → dict</span> <span class="fn-tag">detect.py:1288</span><span class="fn-one-liner">掃描整棵目錄樹，回傳分類好的檔案清單與語料統計。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p><code>detect()</code> 是管線的第一站，也承擔最多「別掃到不該掃的」責任：</p>
+<ol>
+<li><strong>前置</strong>：解析 root、處理已移除的 <code>.graphifyinclude</code>（印警告）、讀取 <code>.graphifyignore</code> 合併 <code>.gitignore</code> 規則。</li>
+<li><strong>走訪</strong>：<code>os.walk(followlinks=…, onerror=…)</code> 遞迴掃描。<code>onerror</code> 確保中途的 PermissionError 不會變成「靜默地少掃一個資料夾」。</li>
+<li><strong>逐目錄修剪</strong>：遇到 noise 目錄（<code>node_modules</code>、<code>.next</code> 等）、被 ignore 規則排除的目錄，直接 <code>dirnames[:] = kept_dirs</code> 就地修剪，<code>os.walk</code> 就不會往下走。</li>
+<li><strong>逐檔過濾</strong>：跳過 <code>_SKIP_FILES</code>、自己輸出的 <code>converted/</code> sidecar、symlink 逃出掃描根目錄的、敏感檔。</li>
+<li><strong>特別處理</strong>：Google Workspace shortcut 與 Office 檔轉成 Markdown sidecar；每個非影片檔統計字數（有 stat 快取）。</li>
+<li><strong>回報</strong>：回傳 <code>{files, total_files, total_words, needs_graph, warning, skipped_sensitive, unclassified, ignored, …}</code>——所有「被排除的」都有記錄，不會默默消失。</li>
+</ol>
+<p class="hint">注意回傳結構：<code>needs_graph</code> 與 <code>warning</code> 會告訴上層「語料太小，可能不需要圖」或「語料太大，語意抽取會很貴」。</p>
+</div>
+<div class="src-block">
+<div class="src-line"><span class="ln">1288</span><span class="code"><span class="hl">def detect</span>(root: Path, *, follow_symlinks=None, google_workspace=None,</span></div>
+<div class="src-line"><span class="ln">1289</span><span class="code">              extra_excludes=None, cache_root=None, gitignore=True) -&gt; dict:</span></div>
+<div class="src-line"><span class="ln">1377</span><span class="code">        <span class="hl">for dirpath, dirnames, filenames in os.walk(</span></span></div>
+<div class="src-line"><span class="ln">1378</span><span class="code">            scan_root, followlinks=follow_symlinks, onerror=_on_walk_error</span></div>
+<div class="src-line"><span class="ln">1408</span><span class="code">                <span class="hl">for d in dirnames:</span></span></div>
+<div class="src-line"><span class="ln">1429</span><span class="code">                <span class="hl">dirnames[:] = kept_dirs</span>   <span class="hl"># 就地修剪：不掃 noise 目錄</span></span></div>
+<div class="src-line"><span class="ln">1468</span><span class="code">        <span class="hl">ftype = classify_file(p)</span>   <span class="hl"># 決定走哪條路徑</span></span></div>
+<div class="src-line"><span class="ln">1534</span><span class="code">    <span class="hl">return { "files": …, "warning": warning, "skipped_sensitive": … }</span></span></div>
+</div>
+<div class="anno-para"><strong>設計重點</strong>：這個函數把「掃描」與「分類」拆開，並把所有排除事件都記錄下來——這在實際 repo 上很重要，否則使用者根本不知道某個目錄為什麼沒進圖。</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_is_noise_dir · _is_sensitive · _is_ignored 系列</span> <span class="fn-tag">detect.py 各處</span><span class="fn-one-liner">過濾的三大支柱：雜訊目錄、敏感檔、ignore 規則。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>三個段落式講解的過濾器：</p>
+<ul>
+<li><code>_is_noise_dir(part, parent)</code> — 判斷目錄名是不是框架快取/產物（<code>.next</code>、<code>.nuxt</code>、<code>node_modules</code>…）。<strong>注意</strong>：dot 目錄（<code>.github</code>、<code>.claude</code>）是允許的，使用者常常想把它們畫進圖。</li>
+<li><code>_is_sensitive(path)</code> — 環境變數檔（<code>.env</code> 等）與金鑰相關檔案不進圖，避免把密鑰抽成節點。</li>
+<li><code>_is_ignored(path, root, patterns, _cache=…)</code> — 核心 ignore 引擎，支援 gitignore 語法（<code>!</code> 否定、anchored patterns、<code>.gitignore</code> 合併、last-match-wins）。<code>_cache</code> 在整個掃描過程共享，避免每個檔重算。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<hr>
+
+<h2>2. extract.py — 把檔案抽成圖的片段</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">extract(paths, *, root, parallel, …)</span> <span class="fn-sig">list[Path] → dict</span> <span class="fn-tag">extract.py:4688</span><span class="fn-one-liner">兩遍處理：逐檔 AST 抽取 → 跨檔 import 解析（產生 INFERRED 邊）。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>這是程式碼抽取的入口。docstring 講得很清楚，兩遍：</p>
+<ol>
+<li><strong>Phase 1 — 逐檔結構抽取</strong>：每個程式碼檔用 tree-sitter 解析，抽出類別、函數、import。</li>
+<li><strong>Phase 2 — 跨檔解析</strong>：把「檔案級 import」變成「類別級 INFERRED 邊」——例如 <code>DigestAuth --uses--> Response</code>。</li>
+</ol>
+<p>實作上最關鍵的是「<strong>快取與平行化</strong>」：</p>
+<ul>
+<li>先依 <code>_get_extractor(path)</code> 找出每個檔的抽取器；沒有抽取器的檔直接給空結果。</li>
+<li>非 bypass 快取的檔先查 SHA256 內容快取（<code>load_cached</code>），命中就直接用。</li>
+<li>剩下的 <code>uncached_work</code> 若超過平行門檻（<code>_PARALLEL_THRESHOLD</code>）就用 <code>ProcessPoolExecutor</code> 平行抽取（<code>_extract_parallel</code>，繞過 GIL）；池中途壞掉時，<code>_extract_sequential</code> 只重抽沒完成的（issue #2444）。</li>
+<li>抽取結果後段有一大串「<strong>醒目標記</strong>」：零節點檔（#1666）、無抽取器但歸類為 code 的副檔名（#1689）、缺相依套件的副檔名（#1745）——每一種都印出清楚警告，並附上解決提示（例如 <code>pip install "graphifyy[sql]"</code>）。</li>
+</ul>
+<div class="anno-para"><strong>閱讀提示</strong>：這 5993 行的檔案裡，最值得看的是 4688 的 <code>extract()</code> 主流程、後段的 ID 正規化/重映射（為了跨機器與 AST↔semantic 一致），以及語言的 <code>_import_*</code> 家族。這裡只帶你看主流程；語言的通用抽取邏輯在 <a href="extractors.html">extractors</a> 頁。</div>
+</div>
+<div class="src-block">
+<div class="src-line"><span class="ln">4700</span><span class="code"><span class="hl">Two-pass process:</span></span></div>
+<div class="src-line"><span class="ln">4701</span><span class="code">1. Per-file structural extraction (classes, functions, imports)</span></div>
+<div class="src-line"><span class="ln">4702</span><span class="code">2. Cross-file import resolution: file imports -&gt; class-level INFERRED edges</span></div>
+<div class="src-line"><span class="ln">4786</span><span class="code">    <span class="hl">for i, path in enumerate(paths):</span></span></div>
+<div class="src-line"><span class="ln">4787</span><span class="code">        <span class="hl">if _get_extractor(path) is None:</span>  <span class="hl"># 無抽取器 → 空結果</span></span></div>
+<div class="src-line"><span class="ln">4790</span><span class="code">        <span class="hl">bypass_cache = path.suffix in _JS_CACHE_BYPASS_SUFFIXES</span></span></div>
+<div class="src-line"><span class="ln">4792</span><span class="code">        <span class="hl">cached = load_cached(path, root, …)</span>  <span class="hl"># SHA256 內容快取</span></span></div>
+<div class="src-line"><span class="ln">4796</span><span class="code">        <span class="hl">uncached_work.append((i, path))</span></span></div>
+<div class="src-line"><span class="ln">4801</span><span class="code">        <span class="hl">if parallel and len(uncached_work) &gt;= _PARALLEL_THRESHOLD:</span></span></div>
+<div class="src-line"><span class="ln">4802</span><span class="code">            <span class="hl">ran_parallel = _extract_parallel(…)</span>  <span class="hl"># 平行多處理</span></span></div>
+<div class="src-line"><span class="ln">4898</span><span class="code">    <span class="hl">all_nodes, all_edges, all_raw_calls</span> = [], [], []   <span class="hl"># 合併所有結果</span></span></div>
+</div>
+<div class="anno-para"><strong>設計重點</strong>：<code>extract()</code> 對「失敗」極度敏感——零節點、無抽取器、缺相依，每一種都明確印出警告。理由是：<em>一個檔默默消失</em>是最難除錯的資料問題。</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_get_extractor(path)</span> <span class="fn-sig">Path → Any | None</span> <span class="fn-tag">extract.py:4413</span><span class="fn-one-liner">依副檔名/檔名/shebang 選出對的抽取器。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>dispatch 邏輯的「動腦」所在：</p>
+<ul>
+<li><strong>檔名優先</strong>：<code>.blade.php</code>、MCP config、套件 manifest 都先於泛型副檔名比對。</li>
+<li><strong>歧義副檔名特判</strong>：<code>.h</code> 可能是 C/C++/ObjC——用內容 sniff（<code>_is_objc_header</code>、<code>_is_cpp_header</code>）決定；<code>.m</code> 可能是 Objective-C 或 MATLAB——只有真的像 ObjC 才走 <code>extract_objc</code>，否則寧可沒抽取器（會被警告）也不硬解析。</li>
+<li><strong>無副檔名</strong>：靠 shebang 判斷直譯器（<code>#!/usr/bin/env bash</code> → <code>extract_bash</code>）。</li>
+<li>最後才查 <code>_DISPATCH</code> 表。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">extract_python(path)</span> <span class="fn-sig">Path → dict</span> <span class="fn-tag">extract.py:1190</span><span class="fn-one-liner">Python 抽取的入口——通用抽取 + rationale（docstring）抽取。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>語言的抽取函數其實都很薄——真正的邏輯在 <code>_extract_generic(path, config)</code>（來自 <code>extractors/engine.py</code>，見 <a href="extractors.html">extractors 頁</a>）與一顆 <code>LanguageConfig</code>：</p>
+<pre><code>def extract_python(path: Path) -&gt; dict:
+    result = _extract_generic(path, _PYTHON_CONFIG)   # 通用 tree-sitter 走訪
+    if "error" not in result:
+        _extract_python_rationale(path, result)       # 補 docstring / # NOTE 節點
+    return result</code></pre>
+<p>這說明了 0.3.0 那次「2527 → 1588 行」重構的成果：12 份複製貼上的語言抽取器收斂成「<strong>設定 + 通用引擎</strong>」。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_file_node_id(rel_path)</span> <span class="fn-sig">Path → str</span> <span class="fn-tag">extract.py:177</span><span class="fn-one-liner">檔案節點 ID 的規範形式：{parent_dir}_{stem}。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>節點 ID 是 graphify 最容易踩雷的地方。規範：<code>{parent_dir}_{stem}</code>——只取一層父目錄、去掉副檔名。頂層檔收斂成裸 stem（<code>setup.py</code> → <code>setup</code>）。</p>
+<p>docstring 強調 <strong>這必須跟語意子代理產生的 ID 一致</strong>，否則 AST 與 semantic 抽取會把同一檔案拆成兩個不相連的「ghost 節點」。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_import_* 家族與 rationale 抽取</span> <span class="fn-tag">extract.py 各處</span><span class="fn-one-liner">各語言的 import 處理與「為什麼」節點。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：</p>
+<ul>
+<li><code>_import_python</code> / <code>_import_js</code> / <code>_import_java</code> … — 每種語言的 import 語句怎麼變成邊。簽名幾乎一致：<code>(node, source, file_nid, stem, edges, str_path, scope_stack)</code>。</li>
+<li><code>_extract_python_rationale</code> — 把 docstring 與 <code># NOTE:</code> / <code># WHY:</code> 註解抽成「rationale 節點」並連回它們說明的程式碼——這是 GRAPH_REPORT 裡「the why」的來源。</li>
+<li><code>_shorten_rationale_label</code> — 過長註解截斷成 80 字元。</li>
+<li><code>_is_autogenerated_python</code> — 偵測自動產生的 Python（避免把產物當原始碼抽）。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<hr>
+
+<h2>3. build.py — 併成 NetworkX 圖</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">build(extractions, *, directed, dedup, …)</span> <span class="fn-sig">list[dict] → nx.Graph</span> <span class="fn-tag">build.py:1264</span><span class="fn-one-liner">把多份抽取結果合併成單一圖；預設先做實體去重。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>這是「進料 → 一張圖」的合併點：</p>
+<ol>
+<li>把每份 extraction 的 <code>nodes</code>、<code>edges</code>、<code>hyperedges</code>、token 統計全部併進一個 <code>combined</code> dict。</li>
+<li>預設 <code>dedup=True</code>：先做型別強制（<code>_coerce_non_string_ids</code>）與欄位別名整併（<code>_fold_node_aliases</code>），再呼叫 <code>deduplicate_entities()</code>（見 <a href="ops.html">ops · dedup</a>），處理同實體不同 label 的問題。</li>
+<li>最後交給 <code>build_from_json()</code> 真正組圖。</li>
+</ol>
+<div class="anno-para"><strong>介面哲學</strong>：<code>build()</code> 只管「合併 + 可選去重」，真正組圖的 dirty work 在 <code>build_from_json</code>——這讓測試可以分層：測合併邏輯 vs 測組圖邏輯。</div>
+</div>
+<div class="src-block">
+<div class="src-line"><span class="ln">1288</span><span class="code">    combined: dict = {"nodes": [], "edges": [], "hyperedges": [],</span></div>
+<div class="src-line"><span class="ln">1289</span><span class="code">                    "input_tokens": 0, "output_tokens": 0}</span></div>
+<div class="src-line"><span class="ln">1295</span><span class="code">    <span class="hl">if dedup and combined["nodes"]:</span></span></div>
+<div class="src-line"><span class="ln">1307</span><span class="code">        combined["nodes"], combined["edges"] = <span class="hl">deduplicate_entities(…)</span></span></div>
+<div class="src-line"><span class="ln">1311</span><span class="code">    <span class="hl">return build_from_json(combined, directed=directed, root=root)</span></span></div>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">deduplicate_by_label(nodes, edges)</span> <span class="fn-sig">→ (nodes, edges)</span> <span class="fn-tag">build.py:1322</span><span class="fn-one-liner">依正規化 label 併節點——<strong>但這是「dormant」程式碼</strong>。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>一個很有趣的「活化石」：docstring 很誠實地承認——這個函數<strong>沒有接進 <code>build()</code></strong>。真正在用的是 <code>deduplicate_entities()</code>（dedup.py）。它只依 label 合併、沒有 <code>file_type</code> 保護，所以<strong>不能</strong>給 code 節點用（兩個不同檔案的 <code>Account</code> 型別會被錯誤併成一個）。</p>
+<p>它是「label-only 去重」的對照組：合併時偏好無 chunk 後綴（<code>_c\d+</code>）的短 ID，並丟掉合併造成的自環。</p>
+<p class="hint">教學價值：一份開源專案保留「被取代的舊實作」並用 docstring 說明為什麼不用，勝過直接刪掉——這份歷史讓新讀者理解去重演進。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">build_from_json(extraction, *, directed, root)</span> <span class="fn-sig">dict → nx.Graph</span> <span class="fn-tag">build.py:741</span><span class="fn-one-liner">真正把 nodes/edges/hyperedges 組進 NetworkX 圖，含大量 ID 正規化與防護。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>這是最髒也最重要的組圖函數（741–1264 約 500 行），它處理一大堆邊角：</p>
+<ul>
+<li><strong>ID 正規化</strong>：非字串 ID 轉字串、legacy ID 遷移（<code>_semantic_id_remap</code>）、doc/ AST twin 重映射。</li>
+<li><strong>檔名消歧</strong>：不同目錄同名檔案標籤加上最短唯一後綴（<code>_disambiguate_file_node_labels</code>）。</li>
+<li><strong>超邊</strong>：<code>G.graph["hyperedges"]</code> 的寫入與正規化。</li>
+<li><strong>防護</strong>：shrink guard（不讓更小的圖覆蓋）、錯誤標記、prune。</li>
+</ul>
+<p class="hint">實際看 graph 屬性時，節點會帶 <code>_community</code>、<code>_source_file</code>、<code>_degree</code> 等前綴屬性——那是在 <code>export</code> 前由 <code>cluster</code>/<code>analyze</code> 加上去的。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">build_merge / merge_raw_extraction</span> <span class="fn-tag">build.py:1547 / 1426</span><span class="fn-one-liner">增量更新的合併路徑——把新抽取併入既有圖、剪除已刪檔。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>這是 <a href="../incremental.html">增量更新設計</a> 的實作點。與 <code>build()</code>（從零合併）不同，<code>build_merge()</code> 讀取既有的 <code>graph.json</code>，把這次的 <code>new_chunks</code> 併進去，並用 <code>prune_sources</code> 把已刪除檔案產生的節點剪掉。它處理跨檔邊的存活（changed file 指到 unchanged target 的邊要保留）、shrink guard、與 manifest 的一致性。</p>
+</div>
+</div>
+</details>
+
+<hr>
+
+<h2>4. cluster.py — 社群偵測（小而精，320 行全文）</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">_partition(G, resolution)</span> <span class="fn-sig">nx.Graph → {node: cid}</span> <span class="fn-tag">cluster.py:22</span><span class="fn-one-liner">先試 Leiden（graspologic），缺套件就退回 Louvain（networkx）。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>「最佳品質優先、退化優雅」的代表作：</p>
+<ul>
+<li>先把節點/邊<strong>排序後重組</strong>成 <code>stable</code> 圖——讓分群輸入確定性（同樣的圖一定同樣的輸入順序）。</li>
+<li>試 <code>from graspologic.partition import leiden</code>，透過 <code>inspect.signature</code> 動態傳 <code>random_seed=42</code>、<code>trials=1</code>、<code>resolution</code>（相容不同版本的 graspologic）。</li>
+<li>呼叫期間把 <code>stdout/stderr</code> 導到 devnull——graspologic 會印 ANSI 進度條，在 Windows PowerShell 5.1 會毀掉 scroll buffer（issue #19，一個很實用的雷）。</li>
+<li><code>ImportError</code> 就退回 networkx 的 Louvain，同樣用 <code>inspect.signature</code> 相容版本差異（<code>max_level</code> 只傳給支援的版本）。</li>
+</ul>
+</div>
+<div class="src-block">
+<div class="src-line"><span class="ln">47</span><span class="code">    <span class="hl">try:</span></span></div>
+<div class="src-line"><span class="ln">48</span><span class="code">        <span class="hl">from graspologic.partition import leiden</span></span></div>
+<div class="src-line"><span class="ln">51</span><span class="code">        <span class="hl">if "random_seed" in lsig: kwargs["random_seed"] = 42</span></span></div>
+<div class="src-line"><span class="ln">61</span><span class="code">            <span class="hl">with _suppress_output():</span>   <span class="hl"># 擋 ANSI 逃逸碼</span></span></div>
+<div class="src-line"><span class="ln">67</span><span class="code">    <span class="hl">except ImportError:</span></span></div>
+<div class="src-line"><span class="ln">76</span><span class="code">    <span class="hl">return</span> {node: cid for cid, nodes in enumerate(communities) for node in nodes}</span></div>
+</div>
+</div>
+</details>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">cluster(G, resolution, exclude_hubs_percentile)</span> <span class="fn-sig">nx.Graph → {cid: [nodes]}</span> <span class="fn-tag">cluster.py:134</span><span class="fn-one-liner">完整分群流程：isolate 處理、hub 排除、過大社群拆分、凝聚力再拆分、ID 穩定化。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>這是 <code>cluster.py</code> 的主角，把「分群」這件事補齊到實用：</p>
+<ol>
+<li><strong>空圖/無邊</strong>：0 節點回空；無邊時每個節點自成一群。</li>
+<li><strong>有向轉無向</strong>：Leiden/Louvain 需要無向輸入。</li>
+<li><strong>hub 排除</strong>（<code>exclude_hubs_percentile</code>）：度數超過百分位的「超集線器」不參與分群（避免把無關子系統拉進同群），之後依鄰居社群多數決重新掛回。</li>
+<li><strong>isolate</strong>：0 度的節點各自成單節點社群。</li>
+<li><strong>過大社群拆分</strong>：> 25% 節點（至少 10 個）的社群，在子圖上再跑一次 <code>_partition</code> 拆開。</li>
+<li><strong>凝聚力再拆分</strong>：doc-hub 節點（如 CLAUDE.md 連到所有東西）會製造低凝聚力社群——凝聚力 &lt; 0.05 且 &ge; 50 節點的再拆一次。</li>
+<li><strong>ID 穩定化</strong>：社群依大小降序重新編號，同大小用 <code>tuple(sorted(nodes))</code> 當總序 tiebreak——否則每次跑，那些等大小的社群 ID 會亂跳，造成偽「社群 churn」（issue #1090）。</li>
+</ol>
+<div class="anno-para"><strong>一個很好的「工程課」</strong>：分群演算法（Leiden）本身只是第一步；真正讓它可用的是圍繞它的工程——確定性、isolate、hub、過大/低凝聚力拆分、ID 穩定。演算法 20 行，工程 200 行。</div>
+</div>
+<div class="src-block">
+<div class="src-line"><span class="ln">175</span><span class="code">    isolates = [n for n in G.nodes() if G.degree(n) == 0 …]</span></div>
+<div class="src-line"><span class="ln">186</span><span class="code">    <span class="hl">for node in isolates:</span> raw[next_cid] = [node]; next_cid += 1</span></div>
+<div class="src-line"><span class="ln">210</span><span class="code">    max_size = max(_MIN_SPLIT_SIZE, int(G.number_of_nodes() * 0.25))</span></div>
+<div class="src-line"><span class="ln">222</span><span class="code">        <span class="hl">if len(nodes) &gt;= 50 and cohesion_score(G, nodes) &lt; 0.05:</span></span></div>
+<div class="src-line"><span class="ln">235</span><span class="code">    final_communities.sort(key=lambda n: (-len(n), tuple(sorted(n))))</span></div>
+<div class="src-line"><span class="ln">236</span><span class="code">    <span class="hl">return</span> {i: sorted(nodes) for i, nodes in enumerate(final_communities)}</span></div>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">label_communities_by_hub(G, communities)</span> <span class="fn-sig">→ {cid: label}</span> <span class="fn-tag">cluster.py:86</span><span class="fn-one-liner">不用 LLM 的社群命名：取社群內度數最高的成員當名字。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>社群名稱的「零成本」方案：直接用最高度數成員的 label（去掉尾綴 <code>()</code>）。所以報告讀起來是 <code>auth</code> / <code>log_action</code> 而不是 <code>Community 70</code>。平手時用節點 ID 保證跨跑穩定。當有設定 LLM 時，這個預設命名會被更豐富的 LLM 命名覆蓋。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">cohesion_score · score_all · community_member_sigs</span> <span class="fn-tag">cluster.py 各處</span><span class="fn-one-liner">凝聚力計算、全社群評分、成員指紋。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：</p>
+<ul>
+<li><code>cohesion_score(G, nodes)</code> — 實際社內邊數 / 最大可能邊數（<code>n(n-1)/2</code>）。這就是社群「緊密度」的量化。</li>
+<li><code>score_all(G, communities)</code> — 一行迴圈，把每個社群算一遍凝聚力，回傳 <code>{cid: score}</code>。</li>
+<li><code>community_member_sigs(communities)</code> — 每個社群算「成員 ID 排序後的 SHA256 指紋」，存到 <code>.graphify_labels.json</code> 旁。之後 <code>cluster-only</code> 可以判斷哪個社群真的變了——成員不再雜湊一致的社群是「不同社群」，沿用舊 label 就是「stale label」bug。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<div class="callout"><strong>看完這頁你應該能說出</strong>：<code>detect</code> 怎麼決定一個檔案走 AST 還是 LLM；<code>extract</code> 的快取與平行策略；<code>build</code> 的 dedup 在哪一步；<code>cluster</code> 為了確定性做了哪三件事。接著讀 <a href="analysis.html">analyze + report</a> 看「圖建好之後怎麼分析」。</div>
+
+<p class="hint">相關：<a href="extractors.html">extractors 語言抽取器</a> · <a href="../incremental.html">增量更新設計</a> · <a href="../../map.html">概念地圖</a></p>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

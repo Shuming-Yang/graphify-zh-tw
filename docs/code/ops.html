@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>程式碼對照 · ops 維運與安全 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>ops：維運與安全</h1>
+  <div class="subtitle">cache / dedup / ingest / watch / serve / security / validate——圍繞主線的服務層</div>
+  <div class="badge-line">檔案：<code>cache.py</code> · <code>dedup.py</code> · <code>ingest.py</code> · <code>watch.py</code> · <code>serve.py</code> · <code>security.py</code> · <code>validate.py</code></div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p>主線 pipeline（detect→export）是「一次跑完」，而這七支模組是「反覆使用 / 對外服務」時需要的：快取讓重跑便宜、dedup 讓圖乾淨、ingest 進料、watch 盯變化、serve 對外查詢、security/validate 把關。</p>
+
+<hr>
+
+<h2>1. cache.py — 重跑不重做</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">load_cached · save_cached · file_hash</span> <span class="fn-tag">cache.py 各處</span><span class="fn-one-liner">SHA256 內容快取的三本柱。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>快取是「圖越大越省」的來源之一：</p>
+<ul>
+<li><code>file_hash(path, root, cache_root)</code> — 算檔案的內容雜湊（<code>_body_content</code> 只算內容、不含路徑——所以改名也能沿用快取；用 <code>_stat_index</code> 以 stat 簽名快取雜湊本身，避免大檔每次重算）。</li>
+<li><code>load_cached(path, root, kind)</code> — 依內容雜湊找快取；載入時會把快取內的絕對路徑/ID<strong>重新對齊</strong>到目前的 root（<code>_relativize_*</code> / <code>_absolutize_*</code>），所以換機器、搬資料夾都能用。</li>
+<li><code>save_cached(path, result, root, kind)</code> — 寫快取，同樣做路徑可攜化。</li>
+<li><code>cached_files</code> / <code>clear_cache</code> — 列出快取檔 / 清空。</li>
+</ul>
+<p class="hint">除此之外還有 <code>prompt_fingerprint</code>（對 prompt 內容算指紋，語意抽取的快取 key 之一）與 <code>cached_word_count</code>（detect 的字數統計快取）。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">check_semantic_cache · save_semantic_cache</span> <span class="fn-tag">cache.py</span><span class="fn-one-liner">語意抽取專用快取（<a href="../incremental.html">增量設計</a> 的一等公民）。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：與 AST 快取同構，但存的是 LLM 抽取的結果。文件語料每次只把 <code>uncached_files</code> 送 LLM，其餘從快取載入——這是「每天更新的 1000 檔語料」能維持低成本的核心。</p>
+</div>
+</div>
+</details>
+
+<hr>
+
+<h2>2. dedup.py — 實體去重</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">deduplicate_entities(nodes, edges, *, communities, …)</span> <span class="fn-sig">→ (nodes, edges)</span> <span class="fn-tag">dedup.py:320</span><span class="fn-one-liner">完整去重管線：ID 預合併 → label 模糊合併 → 邊重接。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>這是 <a href="../incremental.html">設計文件</a> 的落地實作，比設計更周全：</p>
+<ol>
+<li><strong>跨專案防護</strong>：節點帶 <code>repo</code> 欄位且超過一個 repo → 直接 raise。不同 repo 的 label 撞名是巧合，絕不能靠字串相似度合併。</li>
+<li><strong>ID 預合併</strong>：每個 ID 只留一個節點，生還者是「<em>定義</em>這個 ID 的節點」（其 source_file 就是 ID 編碼的那個檔），不是「第一個看到的」——這樣 chunk 順序不決定誰生還（issue #1851）。同源重複的缺失屬性補進生還者（AST 結構與語意補充共存）。</li>
+<li>接著是 label 層的模糊合併（entropy gate → MinHash/LSH → Jaro-Winkler → community boost → union-find → 可選 LLM 仲裁），每步都有對應的 <code>_*</code> helper。</li>
+<li>最後把邊重接到生還者。</li>
+</ol>
+<div class="anno-para"><strong>設計重點</strong>：<code>_collision_rank</code> 提供「總序」，讓「誰是生還者」與節點到達順序無關——這是去重正確性的關鍵，也是被反覆強調的 issue #1851。</div>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_entropy · _shingles · _make_minhash · _is_variant_pair</span> <span class="fn-tag">dedup.py 各處</span><span class="fn-one-liner">去重管線的零件。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：</p>
+<ul>
+<li><code>_entropy(label)</code> — 算 label 的資訊熵（bits/char），短歧義名（<code>AI</code>、<code>x</code>）太低就不做模糊比對。</li>
+<li><code>_shingles(text, k)</code> / <code>_make_minhash(text)</code> — 3-gram shingles + MinHash（128 排列），供 LSH blocking 用 O(n) 產生候選對。</li>
+<li><code>_is_variant_pair(a, b)</code> — 判斷是否為「變體對」（錯字、複數、空格等）。</li>
+<li><code>_crossfile_fileanchored_blocked</code> — 跨檔 + 檔錨定的節點不作模糊合併（避免 <code>Account</code> 型別誤併）。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<hr>
+
+<h2>3. ingest.py — 進料</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">ingest(url, target_dir, author, contributor)</span> <span class="fn-sig">→ Path</span> <span class="fn-tag">ingest.py:218</span><span class="fn-one-liner">抓 URL 並存進 corpus（<code>graphify add</code> 的實作）。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：<code>_detect_url_type</code> 先判斷 URL 類型（網頁 / arxiv / tweet / 影音 / 一般二進位），再分派到 <code>_fetch_webpage</code>（HTML→Markdown）、<code>_fetch_arxiv</code>（論文）、<code>_fetch_tweet</code>、<code>_download_binary</code>。所有抓取都走 <a href="#security">security 的 safe_fetch</a>。</p>
+</div>
+</div>
+</details>
+
+<hr>
+
+<h2>4. watch.py — 盯變化</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">watch · _reconcile_existing_graph · _check_shrink …</span> <span class="fn-tag">watch.py（1845 行）</span><span class="fn-one-liner">監看資料夾並在程式碼變更時重建圖。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明（這支很大，挑重點）：</p>
+<ul>
+<li>用 pending 佇列（<code>_queue_pending</code> / <code>_drain_pending</code>）把變更先落地、再重建成圖，避免熱循環。</li>
+<li><code>_rebuild_lock</code> — 防止併發重建。</li>
+<li><code>_reconcile_existing_graph</code> — 把既有圖與新抽取結果調和（增量更新）。</li>
+<li><code>_check_shrink</code> — 與 <code>to_json</code> 的 shrink guard 對應，重建結果更小就不覆寫。</li>
+<li>文件頂部有一串 resource limits / git_head / 路徑處理的 helper。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<hr>
+
+<h2>5. serve.py — 對外查詢</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">start_server / MCP 工具 · _score_nodes · _query_terms …</span> <span class="fn-tag">serve.py</span><span class="fn-one-liner">把圖暴露成 MCP server；query 走加權評分而非暴力搜索。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：<code>python -m graphify.serve graphify-out/graph.json</code> 啟動 MCP stdio server，提供 <code>query_graph</code>、<code>get_node</code>、<code>get_neighbors</code>、<code>shortest_path</code> 等工具。</p>
+<p>query 不是簡單關鍵字比對，而是一套加權評分：<code>_query_terms</code> 切詞（含中文分詞，jieba）→ <code>_compute_idf</code> 算 IDF → <code>_trigram_index</code> 建三字母索引加速候選 → <code>_score_nodes</code> / <code>_score_query</code> 評分。還有 <code>_GraphContextCache</code> 做多專案圖的快取、<code>_load_graph</code> 對損壞圖的復原訊息（見 <a href="../security.html">SECURITY.md</a>）。</p>
+</div>
+</div>
+</details>
+
+<hr>
+
+<h2 id="security">6. security.py — 安全把關</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">validate_url(url)</span> <span class="fn-sig">str → str</span> <span class="fn-tag">security.py:103</span><span class="fn-one-liner">SSRF 防護第一關：只准 http/https、擋私有 IP 與雲端 metadata。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>SSRF 防護的解析：</p>
+<ol>
+<li>用 <code>urlparse</code> 檢查 scheme 是否在 <code>_ALLOWED_SCHEMES</code>（http/https）——<code>file://</code>、<code>ftp://</code>、<code>data:</code> 全部擋掉。</li>
+<li>擋已知雲端 metadata hostname（<code>169.254.169.254</code> 等，<code>_BLOCKED_HOSTS</code>）。</li>
+<li><strong>DNS 解析後驗證 IP</strong>：<code>socket.getaddrinfo</code> 把 hostname 解析成 IP，逐一檢查是否落在私有/保留網段（<code>_ip_is_blocked</code>，含 127.x、10.x、169.254.x…）。</li>
+</ol>
+<p class="hint">光這樣還不夠——<code>validate_url</code> 只是入口。真正的連線用 <code>_SSRFGuardedHTTP(S)Connection</code> 子類別（下一個 fn-block）。</p>
+</div>
+<div class="src-block">
+<div class="src-line"><span class="ln">112</span><span class="code">    <span class="hl">if parsed.scheme.lower() not in _ALLOWED_SCHEMES:</span></span></div>
+<div class="src-line"><span class="ln">113</span><span class="code">        <span class="hl">raise ValueError(f"Blocked URL scheme '{parsed.scheme}' …")</span></span></div>
+<div class="src-line"><span class="ln">121</span><span class="code">        <span class="hl">if hostname.lower() in _BLOCKED_HOSTS:</span> <span class="hl">raise ValueError(…)</span></span></div>
+<div class="src-line"><span class="ln">129</span><span class="code">        <span class="hl">infos = socket.getaddrinfo(hostname, None, …)</span></span></div>
+<div class="src-line"><span class="ln">133</span><span class="code">            <span class="hl">if _ip_is_blocked(ip):</span> <span class="hl">raise ValueError(…)</span></span></div>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_SSRFGuardedHTTPConnection 家族</span> <span class="fn-tag">security.py:180-243</span><span class="fn-one-liner">防 DNS-rebind：連線時驗證「真的連到的那個 IP」。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>這是一段很漂亮的進階防禦。註解說得很清楚：<strong>不 monkey-patch 全域 <code>socket.getaddrinfo</code></strong>（那在並發下是 thread-safe 的 TOCTOU 隱患），而是子類別化 HTTP(S) connection——每個連線<strong>只解析一次 DNS</strong>、驗證結果 IP、然後連到那個精確 IP。沒有第二次解析，所以 DNS-rebind 攻擊無法在驗證與連線之間換成私有位址。</p>
+<p class="hint">教學價值：這說明「驗證 URL」與「安全連線」是兩回事——前者是入口檢查，後者是對抗 TOCTOU 的防禦。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">safe_fetch · safe_fetch_text · validate_graph_path · sanitize_label</span> <span class="fn-tag">security.py 各處</span><span class="fn-one-liner">抓取上限、路徑驗證、label 消毒。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：</p>
+<ul>
+<li><code>safe_fetch(url, max_bytes=50MB, timeout=30)</code> — 串流抓取，超過 50MB 中止，非 2xx 拋 HTTPError（錯誤頁不當內容）。</li>
+<li><code>safe_fetch_text(url, max_bytes=10MB)</code> — 文字版。</li>
+<li><code>validate_graph_path(path, base)</code> — 解析路徑並要求落在 <code>graphify-out/</code> 內（防 MCP 路徑穿越）。</li>
+<li><code>sanitize_label(text)</code> — 去控制字元、上限 256 字元、HTML-escape（防 XSS 與 prompt injection）。</li>
+<li><code>check_graph_file_size_cap</code> — graph.json 的 512 MiB 上限。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<hr>
+
+<h2>7. validate.py — 輸入把關</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">validate_extraction(data) · assert_valid(data)</span> <span class="fn-sig">dict → list[str]</span> <span class="fn-tag">validate.py:10</span><span class="fn-one-liner">在 build 前檢查抽取結果的 schema。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：只有 95 行的模組。檢查每個節點/邊的必要欄位（<code>id</code>、<code>label</code>、<code>source_file</code>、<code>source</code>、<code>target</code>、<code>relation</code>），回傳錯誤訊息清單；<code>assert_valid</code> 在錯誤時直接 raise。<code>build_graph()</code> 消費前會先跑它——schema 錯誤就不組圖。</p>
+</div>
+</div>
+</details>
+
+<div class="callout"><strong>看完這頁你應該能說出</strong>：快取的 key 是什麼、dedup 為什麼拒絕跨專案、validate_url 的三道檢查、DNS-rebind 是怎麼被擋的。這裡幾乎每一支模組都是「設計文件（<a href="../incremental.html">incremental</a>、<a href="../security.html">security</a>）→ 實作」的對照。</div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

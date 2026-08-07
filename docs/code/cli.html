@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>程式碼對照 · cli.py 指令層 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>cli.py 指令層</h1>
+  <div class="subtitle">所有 subcommand 的入口——每個指令怎麼路由到對應模組</div>
+  <div class="badge-line">檔案：<code>cli.py</code>（4044 行）· <code>__main__.py</code></div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p>graphify 的 CLI 分成兩層：<code>__main__.py</code> 的 <code>main()</code> / <code>_run_cli()</code> 是殼（處理 encoding、broken pipe、help、版本），真正的指令分派在 <code>cli.py</code> 的 <code>dispatch_command()</code>。而 <code>install/uninstall</code> 家族在 0.8.x 被拆到 <code>install.py</code>（所以 <code>__main__.py</code> 有一大串 re-export）。</p>
+
+<hr>
+
+<h2>1. __main__.py — 入口殼</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">main() · _run_cli() · _silence_broken_pipe()</span> <span class="fn-tag">__main__.py</span><span class="fn-one-liner">console 入口：把「下游讀者提早關閉 pipe」當成成功而不是當機。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p><code>main()</code> 的 docstring 講了一個很實際的問題（issue #1807）：當 <code>graphify query … | head</code> 這種用法，下游 reader（<code>head</code>）提早關掉 stdout，Python 會在上層 flush 時拋 <code>BrokenPipeError</code> 並以 255 結束——CI 或 agent harness 會把一次成功的查詢誤判成失敗。</p>
+<p>解法：</p>
+<ul>
+<li><code>_run_cli()</code> 包在 try 裡，先對 stdout/stderr 做 <code>reconfigure(encoding="utf-8")</code>（跨平台 UTF-8）。</li>
+<li>執行前檢查所有平台的 skill 版本戳記（跳過 install/uninstall/hook-check/hook-guard 這些靜默指令）。</li>
+<li><code>-h/--help/-?` 印出完整的 subcommand 清單。</li>
+<li>捕獲 <code>BrokenPipeError</code> 或 Windows 的 <code>OSError(EINVAL/EPIPE)</code>，呼叫 <code>_silence_broken_pipe()</code>——把 stdout 導到 devnull 後 <code>sys.exit(0)</code>。</li>
+</ul>
+<div class="anno-para"><strong>教學重點</strong>：這是「Unix pipe 習慣 × Python 行為」的相容層——工程師很少想到，但 <code>| head</code> 失敗會讓所有 wrapper 壞掉。</div>
+</div>
+<div class="src-block">
+<div class="src-line"><span class="ln">_run_cli()</span><span class="code">    <span class="hl">if len(sys.argv) &lt; 2 or sys.argv[1] in ("-h","--help","-?"):</span></span></div>
+<div class="src-line"><span class="ln">_run_cli()</span><span class="code">        print("Usage: graphify &lt;command&gt;")  <span class="hl"># 全部 subcommand 清單</span></span></div>
+<div class="src-line"><span class="ln">_run_cli()</span><span class="code">    <span class="hl">if dispatch_install_cli(cmd): return</span>  <span class="hl"># install/uninstall 家族</span></div>
+<div class="src-line"><span class="ln">_run_cli()</span><span class="code">    <span class="hl">dispatch_command(cmd)</span>               <span class="hl"># 其餘指令</span></div>
+<div class="src-line"><span class="ln">main()</span><span class="code">    <span class="hl">try:</span> _run_cli(); sys.stdout.flush()</span></div>
+<div class="src-line"><span class="ln">main()</span><span class="code">    <span class="hl">except BrokenPipeError:</span> _silence_broken_pipe()</span></div>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_check_skill_version(skill_dst) · _version_tuple()</span> <span class="fn-tag">__main__.py</span><span class="fn-one-liner">警告「skill 與套件版本不一致」。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：<code>_check_skill_version</code> 比對安裝的 skill 版本戳記與套件版本。特別處理兩種情形：skill 比套件<strong>新</strong>（那不能叫使用者 <code>graphify install</code>，會 downgrade skill——要升級套件，issue #1568）、references/ sidecar 遺失（提示 repair）。<code>_version_tuple</code> 把版本字串解析成可比較的整數 tuple，非數字 segment 退化成 0。</p>
+</div>
+</div>
+</details>
+
+<hr>
+
+<h2>2. cli.py — 指令分派</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">dispatch_command(cmd)</span> <span class="fn-sig">str → None</span> <span class="fn-tag">cli.py:714</span><span class="fn-one-liner">把第一個參數路由到對應的實作。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>這是一個巨大的 if/elif 分派（4044 行的檔案，多半是它）。每個 subcommand 的處理模式大致是：</p>
+<ol>
+<li>解析 <code>sys.argv</code> 的旗標（用 <code>--flag value</code> 或 <code>--flag=value</code> 兩種形式）。</li>
+<li>找 <code>graph.json</code>（<code>_default_graph_path()</code>，預設 <code>graphify-out/graph.json</code>）。</li>
+<li>呼叫對應模組（<code>graphify.serve</code> / <code>graphify.cluster</code> / <code>graphify.analyze</code>…）或直接操作圖。</li>
+<li>列印結果（文字或 <code>--json</code>）。</li>
+</ol>
+<p>幾個值得注意的指令類別：</p>
+<table>
+<tr><th>類別</th><th>指令</th><th>對應模組</th></tr>
+<tr><td>建圖</td><td><code>extract</code> / <code>update</code> / <code>cluster-only</code> / <code>label</code></td><td>detect / extract / build / cluster / llm</td></tr>
+<tr><td>查詢</td><td><code>query</code> / <code>path</code> / <code>explain</code> / <code>affected</code> / <code>god-nodes</code></td><td>serve（query 引擎）</td></tr>
+<tr><td>進料</td><td><code>add</code> / <code>clone</code> / <code>merge-graphs</code></td><td>ingest / clone</td></tr>
+<tr><td>維運</td><td><code>watch</code> / <code>check-update</code> / <code>hook</code> / <code>benchmark</code></td><td>watch / hooks</td></tr>
+<tr><td>輸出</td><td><code>export callflow-html</code> / <code>tree</code></td><td>callflow_html / tree_html</td></tr>
+<tr><td>記憶</td><td><code>save-result</code> / <code>reflect</code></td><td>reflect</td></tr>
+<tr><td>進階</td><td><code>provider</code> / <code>global</code> / <code>merge-driver</code> / <code>diagnose</code></td><td>llm / global_graph / build</td></tr>
+</table>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_run_hook_guard(kind, strict)</span> <span class="fn-tag">cli.py:491</span><span class="fn-one-liner">hook-guard / hook-check 的實作——「搜尋前先推一下圖」。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>這是 always-on 機制的核心：當 Claude Code / Gemini 的 PreToolUse hook 觸發時，會執行 <code>graphify hook-guard</code>。它判斷目前的搜尋/讀檔是否該被「推一把」——如果圖存在且不是 strict 模式，回傳一個 <code>additionalContext</code> 提示（<code>_SEARCH_NUDGE</code> / <code>_READ_NUDGE</code>）引導助手先 <code>graphify query</code>；strict 模式（<code>_hook_strict_enabled</code>）則會<strong>擋住</strong>第一次原始讀檔並重導到圖。</p>
+<p class="hint">為什麼搬進 Python subcommand？舊 hook 是內嵌 bash 的 <code>python -c "…"</code> 一行流，Windows cmd/PowerShell 解析不了（issue #522）。改成 <code>graphify hook-guard</code> subcommand 後，sh / cmd / PowerShell 都能跑。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_clone_repo(url, …)</span> <span class="fn-tag">cli.py:650</span><span class="fn-one-liner">clone GitHub repo 並印出路徑（<code>graphify clone</code>）。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：<code>graphify clone &lt;github-url&gt;</code> 的實作，把 repo clone 到 <code>~/.graphify/repos/&lt;owner&gt;/&lt;repo&gt;</code>（或 <code>--out</code>），預設用 repo 的預設分支（<code>--branch</code> 可覆寫），最後印出路徑供 skill 的 Step 0 使用。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_StageTimer · _enforce_graph_size_cap_or_exit · _default_graph_path</span> <span class="fn-tag">cli.py 各處</span><span class="fn-one-liner">CLI 的基礎設施。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：</p>
+<ul>
+<li><code>_StageTimer</code> — <code>--timing</code> flag 的實作，用 <code>perf_counter</code> 量每個 pipeline stage 的牆鐘時間。</li>
+<li><code>_enforce_graph_size_cap_or_exit</code> — 載入圖前檢查 512 MiB 上限（與 security 對應）。</li>
+<li><code>_default_graph_path</code> — 預設 <code>graphify-out/graph.json</code> 的解析（尊重 <code>GRAPHIFY_OUT</code> 環境變數）。</li>
+<li><code>_stale_graph_sources</code> / <code>_prune_graph_json_sources</code> — 檢查/剪除過期來源（更新時）。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<div class="callout"><strong>看完這頁你應該能說出</strong>：CLI 的兩層結構、broken pipe 為何重要、hook-guard 跟 install 的關係、<code>install/uninstall</code> 為什麼被拆到 install.py。指令的行為詳解在 <a href="../../docs/index.html">文件教學</a> 與 README 的 <a href="https://github.com/Graphify-Labs/graphify/blob/v8/README.md#full-command-reference">full command reference</a>。</div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>程式碼對照 · analyze + report · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>analyze + report：把圖變成洞見</h1>
+  <div class="subtitle">god nodes、surprising connections、建議問題，與 GRAPH_REPORT.md 的生成</div>
+  <div class="badge-line">檔案：<code>analyze.py</code>（749 行）· <code>report.py</code>（300 行）</div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p>圖建好、分好群之後，<code>analyze</code> 負責「找出這張圖值得說的事」，<code>report</code> 負責把它排版成 <code>GRAPH_REPORT.md</code>——也就是你的 AI 助手會先讀的那份摘要。</p>
+
+<hr>
+
+<h2>1. analyze.py — 圖分析</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">god_nodes(G, top_n)</span> <span class="fn-sig">nx.Graph → list[dict]</span> <span class="fn-tag">analyze.py:109</span><span class="fn-one-liner">找出最「核心」的抽象——排除檔案級 hub 與內建型別雜訊。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>「god node = 最高度數節點」這個直覺很簡單，但實作關鍵在「<strong>排除誰</strong>」：</p>
+<ul>
+<li>檔案級 hub 節點（<code>_is_file_node</code>）排除——它們機械式地累積 import/contains 邊，不代表真正的架構抽象。</li>
+<li>概念節點（<code>_is_concept_node</code>）與 JSON key 節點排除。</li>
+<li><code>_BUILTIN_NOISE_LABELS</code> 排除——這是 0.8.33 修的 bug：<code>str</code>、<code>int</code>、<code>MagicMock</code> 等內建型別節點曾灌爆度數、把真正的抽象擠出 god-node 排名。</li>
+</ul>
+<div class="anno-para"><strong>教學重點</strong>：一個「找最高度數」的函數，真正的功力在「懂得排除雜訊」。程式 20 行，問題定義（什麼算真抽象）是它價值的 80%。</div>
+</div>
+<div class="src-block">
+<div class="src-line"><span class="ln">115</span><span class="code">    degree = dict(G.degree())</span></div>
+<div class="src-line"><span class="ln">116</span><span class="code">    sorted_nodes = sorted(degree.items(), key=lambda x: x[1], reverse=True)</span></div>
+<div class="src-line"><span class="ln">119</span><span class="code">        <span class="hl">if _is_file_node(G, nid) or _is_concept_node(G, nid) or _is_json_key_node(G, nid):</span></span></div>
+<div class="src-line"><span class="ln">120</span><span class="code">            <span class="hl">continue</span>   <span class="hl"># 排除機械 hub</span></span></div>
+<div class="src-line"><span class="ln">121</span><span class="code">        <span class="hl">if G.nodes[nid].get("label", "") in _BUILTIN_NOISE_LABELS: continue</span></span></div>
+<div class="src-line"><span class="ln">128</span><span class="code">        <span class="hl">if len(result) &gt;= top_n: break</span></span></div>
+</div>
+</div>
+</details>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">surprising_connections(G, communities, top_n)</span> <span class="fn-sig">→ list[dict]</span> <span class="fn-tag">analyze.py:133</span><span class="fn-one-liner">找「真的出乎意料」的連線——依語料規模切換兩種策略。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>「驚喜連線」是報告最有趣的一段。策略依語料規模分流：</p>
+<ul>
+<li><strong>多檔語料</strong>（<code>is_multi_source</code>）：找「跨檔的實體之間」的邊，排序 AMBIGUOUS → INFERRED → EXTRACTED（越不確定越值得看）。</li>
+<li><strong>單檔/單源語料</strong>：找「跨社群」的橋樑邊（用邊的介數中心性）——它揭露非顯而易見的結構耦合。</li>
+</ul>
+<p>概念節點被排除——它們是刻意加入的，不是被發現的。</p>
+</div>
+<div class="src-block">
+<div class="src-line"><span class="ln">152</span><span class="code">    source_files = { data.get("source_file","") for _, data in G.nodes(data=True) … }</span></div>
+<div class="src-line"><span class="ln">157</span><span class="code">    is_multi_source = len(source_files) &gt; 1</span></div>
+<div class="src-line"><span class="ln">159</span><span class="code">    <span class="hl">if is_multi_source:</span> <span class="hl">return _cross_file_surprises(G, …, top_n)</span></div>
+<div class="src-line"><span class="ln">162</span><span class="code">    <span class="hl">else:</span> <span class="hl">return _cross_community_surprises(G, …, top_n)</span></div>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">suggest_questions(G, communities, community_labels, top_n)</span> <span class="fn-sig">→ list[dict]</span> <span class="fn-tag">analyze.py:428</span><span class="fn-one-liner">生成「這張圖特別適合回答的問題」。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>問題來源有四種，每個都帶 <code>type</code> / <code>question</code> / <code>why</code> 三個欄位：</p>
+<ol>
+<li><strong>AMBIGUOUS 邊</strong> → 未解決關係問題：「<code>X</code> 和 <code>Y</code> 的確實關係是什麼？」（因為那條邊被標不確定）。</li>
+<li><strong>橋樑節點</strong>（高介數中心性）→ 跨領域關注問題——那些連接多個社群的節點，可能是 cross-cutting concern。</li>
+<li>未開發的 god nodes → 值得深入的核心抽象。</li>
+<li>孤立節點 → 可能缺邊或未文件化。</li>
+</ol>
+<p class="hint">這種「由圖結構自動生成問題」的能力，正是報告「4-5 個建議問題」的來源——也是 Graphify 最有產品感的輸出之一。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">find_import_cycles(G)</span> <span class="fn-sig">→ list[dict]</span> <span class="fn-tag">analyze.py:640</span><span class="fn-one-liner">在檔案級相依圖上找循環 import。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>回傳「N 檔循環」，供報告的 Import Cycles 章節使用。只對含程式碼的語料有意義——文件語料沒有 import，那一段會是純噪音，所以 <code>report.py</code> 會先檢查圖裡有沒有 code 才輸出。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">graph_diff(G_old, G_new)</span> <span class="fn-sig">→ dict</span> <span class="fn-tag">analyze.py:556</span><span class="fn-one-liner">比較兩張圖的差異（增量更新的「什麼變了」）。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：以 (u, v, relation) 為邊 key 做集合差異，算出新增/移除的節點與邊。這是 <code>graphify update</code> / PR 影響分析背後的差集工具。</p>
+</div>
+</div>
+</details>
+
+<hr>
+
+<h2>2. report.py — 生成 GRAPH_REPORT.md</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">generate(G, communities, cohesion_scores, …, obsidian)</span> <span class="fn-sig">→ str</span> <span class="fn-tag">report.py:71</span><span class="fn-one-liner">把圖 + 分析結果排版成完整 markdown 報告。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>300 行的純函數：<code>generate()</code> 接收所有分析結果，回傳一份 markdown 字串。章節順序即報告的閱讀順序：</p>
+<ol>
+<li><strong>Corpus Check</strong> — 檔案數、字數、語料是否大到需要圖。</li>
+<li><strong>Summary</strong> — 節點/邊/社群數、EXTRACTED/INFERRED/AMBIGUOUS 比例、token 成本。</li>
+<li><strong>Graph Freshness</strong> — <code>built_at_commit</code>（0.7.0 加入，讓團隊能查圖是否過期）。</li>
+<li><strong>Community Hubs</strong> — 社群導覽；只有 <code>--obsidian</code> 時輸出 wikilink，否則純清單（避免預設輸出一堆斷鏈）。</li>
+<li><strong>God Nodes</strong>、<strong>Surprising Connections</strong>、<strong>Import Cycles</strong>（僅含 code）、<strong>Hyperedges</strong>。</li>
+<li><strong>Communities</strong> — 每個社群的 label、凝聚力、前 8 個成員（過薄社群省略）。</li>
+<li><strong>Ambiguous Edges</strong> — 需要人工檢視的邊。</li>
+<li><strong>Knowledge Gaps</strong> — 孤立節點、過薄社群、高 AMBIGUOUS 比例。</li>
+<li><strong>Work-memory lessons</strong> — 從 <code>.graphify_learning.json</code> 來的學習覆蓋層（0.9.x 新功能）。</li>
+<li><strong>Suggested Questions</strong> — 最後放建議問題。</li>
+</ol>
+<div class="anno-para"><strong>設計重點</strong>：報告是「稽核軌跡」——每一段都由圖資料計算出來，而不是 LLM 生成的故事。所以任何數字都可追溯回圖。</div>
+</div>
+<div class="src-block">
+<div class="src-line"><span class="ln">93</span><span class="code">    confidences = [d.get("confidence","EXTRACTED") for _,_,d in G.edges(data=True)]</span></div>
+<div class="src-line"><span class="ln">95</span><span class="code">    <span class="hl">ext_pct = round(confidences.count("EXTRACTED") / total * 100)</span></span></div>
+<div class="src-line"><span class="ln">128</span><span class="code">        f"- {G.number_of_nodes()} nodes · {G.number_of_edges()} edges …"</span></div>
+<div class="src-line"><span class="ln">150</span><span class="code">    <span class="hl">if non_empty:</span> lines += ["", "## Community Hubs (Navigation)"]</span></div>
+<div class="src-line"><span class="ln">164</span><span class="code">        lines.append(f"{i}. `{node['label']}` - {node['degree']} edges")</span></div>
+<div class="src-line"><span class="ln">222</span><span class="code">    <span class="hl">for cid, nodes in communities.items():</span> <span class="hl"># 每個社群一段</span></span></div>
+<div class="src-line"><span class="ln">300</span><span class="code">    <span class="hl">return "\n".join(lines)</span></span>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_safe_community_name · _learning_section · load_learning_for_report</span> <span class="fn-tag">report.py 各處</span><span class="fn-one-liner">報告的配角：檔名安全化、學習章節、工作記憶載入。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：</p>
+<ul>
+<li><code>_safe_community_name(label)</code> — 把社群名變成安全檔名（與 export 的 <code>safe_name</code> 同步），確保 hub 檔名與報告 wikilink 一致。</li>
+<li><code>_learning_section(lines, learning, top_n)</code> — 附加「Work-memory lessons」章節：<code>preferred</code> 來源（過去 session 證實有用）與 <code>dead_ends</code>（帶到死路的問題）。都沒有時整個章節省略。</li>
+<li><code>load_learning_for_report(graph_path)</code> — 讀取 <code>.graphify_learning.json</code> 覆蓋層與 memory docs，best-effort（永遠不 raise，失敗就回 None）。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<div class="callout"><strong>看完這頁你應該能說出</strong>：god nodes 排除哪些節點、surprising connections 怎麼依語料規模分流、GRAPH_REPORT.md 有哪些章節、哪一章節只有含 code 的圖才輸出。接著讀 <a href="export.html">export + exporters</a> 看「圖怎麼變成 graph.html 和其他檔案」。</div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>

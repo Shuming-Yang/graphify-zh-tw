@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>程式碼對照 · extractors 語言抽取器 · Graphify 繁中教學站</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>extractors/ 語言抽取器</h1>
+  <div class="subtitle">「設定 + 通用引擎」——支援 36 種文法的關鍵架構</div>
+  <div class="badge-line">檔案：<code>graphify/extractors/</code>（models 4KB · engine 260KB · resolution 120KB · 20+ 語言檔）</div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p>0.3.0 的重構把 12 份複製貼上的語言抽取器收斂成兩件事：<strong>一顆 <code>LanguageConfig</code>（設定）＋ 一個通用引擎 <code>_extract_generic()</code></strong>。語言差異（「函數節點長什麼樣」「import 怎麼寫」）變成設定；tree-sitter AST 走訪與節點/邊產生變成通用程式碼。這讓加一個語言從「複製 2000 行」變成「寫 100 行設定」。<code>resolution.py</code> 則負責最難的跨檔解析（tsconfig aliases、workspace packages、bare imports）。</p>
+
+<hr>
+
+<h2>1. models.py — 語言設定與符號事實（4KB，很小）</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">class LanguageConfig</span> <span class="fn-sig">dataclass</span> <span class="fn-tag">models.py:14</span><span class="fn-one-liner">「一個語言」的所有設定：節點型別、import 型別、特殊走訪掛勾。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>這個 dataclass 是整個抽取架構的核心抽象。每個語言設定：</p>
+<ul>
+<li>tree-sitter grammar 名稱與 <code>node_types</code> 對應（class / function / method 在該文法裡叫什麼）。</li>
+<li>import / require 的節點型別與邊的關係名稱。</li>
+<li>可掛勾的語言特定回呼：型別收集（<code>collect_type_refs</code>）、額外走訪（<code>extra_walk</code>）、class 基底判斷、decorator 處理、scope 邊界…（這些 function 定義在 engine.py，例如 <code>_python_collect_type_refs</code>、<code>_csharp_extra_walk</code>）。</li>
+<li><code>synthesize_import_module_nodes</code> 等 opt-in 旗標（0.8.40 加的 Swift import 修復）。</li>
+</ul>
+<p>同檔的 <code>_Symbol*Fact</code> dataclasses（<code>_SymbolDeclarationFact</code>、<code>_SymbolImportFact</code>、<code>_SymbolUseFact</code>…）是解析器收集的「符號事實」，供 resolution 用。</p>
+<p class="hint">閱讀建議：先看這個檔，再看 engine.py 的 <code>_extract_generic</code>——你就懂了整個架構。</p>
+</div>
+</div>
+</details>
+
+<hr>
+
+<h2>2. engine.py — 通用抽取引擎（260KB，最大）</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">_extract_generic(path, config)</span> <span class="fn-sig">Path, LanguageConfig → dict</span> <span class="fn-tag">engine.py（由 extract.py 匯入）</span><span class="fn-one-liner">通用 tree-sitter 走訪：把 AST 變成 {nodes, edges}。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>這是所有語言抽取器共用的心臟。它做的事（與 ARCHITECTURE.md 的「新增語言」步驟對應）：</p>
+<ol>
+<li>用 tree-sitter 把檔案解析成 AST（byte slice 一律 <code>errors="replace"</code> 解碼，非 UTF-8 也不當機）。</li>
+<li>依照 <code>config.node_types</code> 走訪 class/function/method 節點，產生節點（ID 用 <code>{file_stem}_{symbol}</code> 形式，附 <code>source_location: L{line}</code>）。</li>
+<li>依照 <code>config.import_types</code> 找 import，產生 <code>imports</code> 邊。</li>
+<li>收集 <code>raw_calls</code>（呼叫事件）供跨檔解析第二遍。</li>
+<li>收集型別引用（<code>collect_type_refs</code>）供型別解析（<code>uses</code> 邊）。</li>
+<li>呼叫語言特定的 <code>extra_walk</code>（如 C# 的 partial class 合併、Swift 的 extension 走訪）。</li>
+</ol>
+<p>整個 260KB 塞滿了各語言的 <code>_*_collect_type_refs</code>、<code>_*_extra_walk</code>、scope 計算、裝飾器、generator、async 等特殊語法的處理——這是「36 種文法」真正的深度所在。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_python_collect_type_refs · _csharp_extra_walk · _ts_extra_walk …</span> <span class="fn-tag">engine.py 各處</span><span class="fn-one-liner">語言特定的掛勾函數家族。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：每個語言在 engine.py 有一組 <code>_&lt;lang&gt;_*</code> 函數，解決「這個語言怎麼解析型別/作用域/特殊語法」：</p>
+<ul>
+<li><code>_python_collect_type_refs</code> — Python 型別註解收集；<code>_PYTHON_ANNOTATION_NOISE</code> 過濾 <code>str/int/MagicMock</code> 等內建型別（0.8.33 的 god-node 修復）。</li>
+<li><code>_csharp_extra_walk</code> / <code>_csharp_partial</code> 系列 — C# partial class 合併、attribute 解析。</li>
+<li><code>_ts_extra_walk</code> / <code>_ts_decorator_name</code> / <code>_ts_receiver_type_table</code> — TypeScript 裝飾器、receiver 型別表。</li>
+<li><code>_swift_pre_scan</code> / <code>_swift_receiver_name</code> — Swift extension 與 receiver 解析。</li>
+<li><code>_js_extra_walk</code> / <code>_js_member_assignment_target</code> — JavaScript 成員指派。</li>
+</ul>
+<p>這組函數的命名規律（<code>_&lt;lang&gt;_&lt;用途&gt;</code>）本身就是一個好索引——看到名字就知道是哪個語言、做什麼。</p>
+</div>
+</div>
+</details>
+
+<hr>
+
+<h2>3. resolution.py — 跨檔解析（120KB）</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">_read_tsconfig_aliases · _load_workspace_packages · _resolve_export_target …</span> <span class="fn-tag">resolution.py 各處</span><span class="fn-one-liner">把「字串 import」解析成「實際檔案」——最難的解析邏輯。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>跨檔解析的難題：<code>import { Foo } from "@/lib/utils"</code> 這個 <code>@/lib/utils</code> 到底是哪個檔案？<code>resolution.py</code> 負責：</p>
+<ul>
+<li><strong>tsconfig paths / baseUrl</strong>：<code>_read_tsconfig_aliases</code>、<code>_resolve_tsconfig_alias</code> 讀 tsconfig 的 aliases，把 <code>@/…</code> 對到實際路徑。</li>
+<li><strong>workspace 套件</strong>：<code>_find_workspace_root</code>、<code>_pnpm_workspace_globs</code>、<code>_load_workspace_packages</code>——monorepo 的 pnpm/yarn workspace 與 package.json <code>exports</code> 欄位解析。</li>
+<li><strong>JS 路徑解析</strong>：<code>_resolve_js_import_path</code> 處理副檔名省略、目錄 index、<code>.js</code> → <code>.ts</code> 轉換。</li>
+</ul>
+<p class="hint">這 120KB 是「讓 <code>calls</code>/<code>imports</code> 邊跨檔對得準」的真相所在——也是整個圖能不能跨檔連起來的關鍵。</p>
+</div>
+</div>
+</details>
+
+<hr>
+
+<h2>4. 語言抽取器一覽</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">語言檔案家族（bash / go / rust / sql / terraform / pascal …）</span> <span class="fn-tag">extractors/</span><span class="fn-one-liner">每個語言一個檔，做「設定 + 通用引擎」以外的專屬處理。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>段落式說明：</p>
+<ul>
+<li><code>sql.py</code>（20KB）— SQL AST 抽取（tables、views、FK、<code>reads_from</code>）；<code>[sql]</code> extra 提供 tree-sitter-sql。</li>
+<li><code>go.py</code> / <code>rust.py</code> / <code>csharp.py</code> / <code>dart.py</code> — 主要語言，各自處理特有的 import/module 系統。</li>
+<li><code>bash.py</code>（22KB）— shell 腳本（<code>source</code>/<code>#include</code> 邊）。</li>
+<li><code>pascal.py</code> + <code>pascal_forms.py</code> — Pascal/Delphi（<code>[pascal]</code> extra）。</li>
+<li><code>terraform.py</code> — HCL（<code>[terraform]</code> extra）。</li>
+<li><code>apex.py</code> — Salesforce Apex（regex-based）。</li>
+<li><code>sln.py</code> — Visual Studio solution 檔（專案參考）。</li>
+<li><code>json_config.py</code> / <code>markdown.py</code> — 特殊格式。</li>
+<li><code>base.py</code>（4KB）— extractor 基底類別。</li>
+</ul>
+<p>還有 <code>MIGRATION.md</code>（5KB）記錄舊架構 → 新架構的遷移。</p>
+</div>
+</div>
+</details>
+
+<div class="callout"><strong>看完這頁你應該能說出</strong>：LanguageConfig 是什麼、加一個語言要改哪裡、tsconfig alias 在 resolution.py 怎麼處理。配合 <a href="pipeline.html">pipeline</a> 的 <code>extract_python</code> 看，整條「設定 → 引擎 → 解析」就完整了。</div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div>
+</body>
+</html>
