@@ -29,3 +29,14 @@
 ```bash
 python3 -m http.server 8000   # 本機預覽
 ```
+
+### 啟用 GitHub Pages（一次性）
+
+本站已 push 到 `main`，只需用 **repo 擁有者帳號**（`Shuming-Yang`，需 admin 權限）做一次設定：
+
+1. 到 <https://github.com/Shuming-Yang/graphify-zh-tw/settings/pages>
+2. **Source** 選 **Deploy from a branch**
+3. **Branch** 選 `main`、資料夾 `/`（root）
+4. Save → 等 1-2 分鐘建置 → 網址 `https://shuming-yang.github.io/graphify-zh-tw/`
+
+（`check-upstream.yml` 每月自動檢查上游 v8 版本並更新版本徽章。）
