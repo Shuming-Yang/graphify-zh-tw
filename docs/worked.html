@@ -36,36 +36,42 @@
 
 <h2>案例總覽</h2>
 <div class="case-grid">
-  <div class="case-card">
+  <a class="case-card" href="case/opencode.html">
+    <span class="cc-name">OpenCode</span>
+    <span class="cc-en">anomalyco/opencode · packages/opencode · TypeScript · 3903 節點</span>
+    <span class="cc-desc">本站的旗艦案例——我們用 graphify 分析「正在用 graphify 建站的工具」本身。opencode@1.18.15 核心 CLI 的 363 個 TypeScript 檔，含版本釘選。</span>
+    <span class="cc-meta"><span class="c-tag">版本釘選 1.18.15</span><span class="c-tag">graph.html 可互動</span></span>
+  </a>
+  <a class="case-card" href="case/rsl-siege-manager.html">
     <span class="cc-name">rsl-siege-manager</span>
     <span class="cc-en">Python + TypeScript monorepo · 真實專案 · 1886 節點</span>
-    <span class="cc-desc">真實網頁 app：FastAPI 後端 + React/Vite 前端 + Python Discord bot，全在一個 repo。三語言跨檔案解析、17 個 Alembic migration、三層架構的社群偵測——本站互動圖的主角。</span>
+    <span class="cc-desc">真實網頁 app：FastAPI 後端 + React/Vite 前端 + Python Discord bot，全在一個 repo。三語言跨檔案解析、17 個 Alembic migration、三層架構的社群偵測。</span>
     <span class="cc-meta"><span class="c-tag">graph.html 可互動</span><span class="c-tag">tests included</span></span>
-  </div>
-  <div class="case-card">
+  </a>
+  <a class="case-card" href="case/karpathy-repos.html">
     <span class="cc-name">karpathy-repos</span>
-    <span class="cc-en">3 repos + 5 papers + 4 images · 52 檔</span>
-    <span class="cc-desc">產出 71.5× token 節省基準的語料。nanoGPT / minGPT / micrograd 三 repo + 5 篇論文 + 圖片，跨 repo 與論文橋接。</span>
-    <span class="cc-meta"><span class="c-tag">71.5× reduction</span></span>
-  </div>
-  <div class="case-card">
+    <span class="cc-en">3 repos + 5 papers + 4 images · 52 檔 · 177 節點</span>
+    <span class="cc-desc">nanoGPT / minGPT / micrograd 三 repo + 5 篇論文 + 圖片，跨 repo 與論文橋接。我們從上游 graph.json 重新分群：177 節點、16 社群，god nodes 含 Value、GPT。</span>
+    <span class="cc-meta"><span class="c-tag">圖資料沿用上游</span><span class="c-tag">我們重新分群</span></span>
+  </a>
+  <a class="case-card" href="case/httpx.html">
     <span class="cc-name">httpx</span>
-    <span class="cc-en">合成 Python 函式庫 · 6 檔</span>
-    <span class="cc-desc">仿照 httpx 架構的合成語料：exceptions → models → auth/transport → client 乾淨分層。144 節點、6 社群。</span>
-    <span class="cc-meta"><span class="c-tag">小語料 · 結構價值</span></span>
-  </div>
-  <div class="case-card">
+    <span class="cc-en">合成 Python 函式庫 · 6 檔 · 193 節點（本站全跑）</span>
+    <span class="cc-desc">仿照 httpx 架構的合成語料：exceptions → models → auth/transport → client 乾淨分層。我們從零到整跑完一次（純程式碼、零 API key）。</span>
+    <span class="cc-meta"><span class="c-tag">本站全跑</span><span class="c-tag">零 API key</span></span>
+  </a>
+  <a class="case-card" href="case/mixed-corpus.html">
     <span class="cc-name">mixed-corpus</span>
-    <span class="cc-en">Python + markdown 論文 + 圖片 · 5 檔</span>
-    <span class="cc-desc">混合輸入：3 個 Python 模組 + 一篇帶 arXiv 引用的論文筆記 + 一張圖。測試不同檔案型別在同一次 run 的處理。</span>
-    <span class="cc-meta"><span class="c-tag">5.4× reduction</span></span>
-  </div>
-  <div class="case-card">
+    <span class="cc-en">Python + markdown 論文 + 圖片 · 5 檔 · 22 節點</span>
+    <span class="cc-desc">混合輸入：3 個 Python 模組 + 一篇帶 arXiv 引用的論文筆記 + 一張圖。圖資料沿用上游（含論文節點），我們重新分群產生互動圖。</span>
+    <span class="cc-meta"><span class="c-tag">小語料</span></span>
+  </a>
+  <a class="case-card" href="case/example.html">
     <span class="cc-name">example</span>
-    <span class="cc-en">小文件管線 · 7 檔 · 2 種語言</span>
-    <span class="cc-desc">可重現的最小範例：parser → validator → processor → storage → api，純 AST + markdown、零語意抽取成本。新手最好從這裡跑起。</span>
-    <span class="cc-meta"><span class="c-tag">新手入門</span></span>
-  </div>
+    <span class="cc-en">小文件管線 · 程式碼 5 檔 · 73 節點</span>
+    <span class="cc-desc">可重現的最小範例：parser → validator → processor → storage → api。我們以 --code-only 跑（文件部分需 LLM，標註略過）。新手建議從這裡跑起。</span>
+    <span class="cc-meta"><span class="c-tag">新手入門</span><span class="c-tag">--code-only</span></span>
+  </a>
 </div>
 
 <hr>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>案例：example · Graphify 繁中教學站</title>
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="../code/index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="../worked.html">← 實作案例</a></div>
+<header>
+<h1>案例：example（新手起點）</h1>
+<div class="subtitle">最小可重現的文件管線——建議新手第一個跑的就是它</div>
+<div class="badge-line">本站以 --code-only 跑（文件部分需 LLM，標註略過）</div>
+</header>
+<div class="guide">
+<h2>案例簡介</h2>
+<p>一個可重現的最小範例：parser → validator → processor → storage → api 的小文件管線，加上架構筆記與研究筆記。官方用它示範「程式碼 + 文件」的圖——但文件部分需要 LLM 語意抽取。</p>
+<p>我們以 <code>--code-only</code> 跑（5 個程式碼檔），文件部分標註略過。想看完整的「文件連到程式碼」，需要 LLM key 跑完整版。</p>
+<h2>我們怎麼跑的</h2>
+<pre><code># 本站跑法（--code-only，零 API key）：
+graphify extract ./raw --code-only   # 73 節點 · 134 邊 · 5 社群
+graphify cluster-only ./raw
+
+# 完整版（含 2 個 markdown，需 LLM key）：
+graphify extract ./raw</code></pre>
+<h2>互動知識圖譜</h2>
+<p>5 個 Python 模組的結構圖。</p>
+<div class="graph-embed">
+  <div class="graph-embed-bar">
+    <span class="g-title">example 知識圖譜（中文界面）</span>
+    <span class="g-links">
+      <a href="../../worked/example/graph-zh.html" target="_blank">開新分頁 ↗</a>
+      <a href="../../worked/example/graph.html" target="_blank">英文版 ↗</a>
+    </span>
+  </div>
+  <iframe src="../../worked/example/graph-zh.html" title="example 知識圖譜（中文界面）"></iframe>
+</div>
+<h2>我們的數字</h2>
+<table><tr><th>指標</th><th>本站結果</th></tr><tr><td>節點數</td><td><code>73</code></td></tr><tr><td>邊數</td><td><code>134</code></td></tr><tr><td>社群數</td><td><code>5</code></td></tr><tr><td>EXTRACTED 邊</td><td><code>100%</code></td></tr><tr><td>INFERRED 邊</td><td><code>0%</code></td></tr></table>
+<p class="hint">純 AST 抽取，100% EXTRACTED——最「乾淨」的小圖。</p>
+<h2>God Nodes 解說</h2>
+<ol><li><code>load_index()</code> — 12 條邊</li><li><code>validate_document()</code> — 10 條邊</li><li><code>parse_file()</code> — 7 條邊</li><li><code>process_and_save()</code> — 7 條邊</li><li><code>_ensure_storage()</code> — 7 條邊</li><li><code>save_parsed()</code> — 7 條邊</li><li><code>save_processed()</code> — 7 條邊</li><li><code>delete_record()</code> — 7 條邊</li><li><code>parse_and_save()</code> — 6 條邊</li><li><code>enrich_document()</code> — 6 條邊</li></ol><p>函數層的 god nodes：<code>load_index()</code>（storage 的索引載入）與 <code>validate_document()</code>（validator 的 schema 檢查）是管線的熱點，符合「storage 是 everything 流經的樞紐」的官方描述。</p>
+<h2>Surprising Connections 解說</h2>
+<p>純程式碼語料、100% EXTRACTED——所以沒有 INFERRED 驚喜連線。這正好示範了「驚喜連線」這個概念：<strong>語料越單一、結構越明顯，驚喜就越少</strong>。</p>
+<h2>重現</h2>
+<pre><code># 語料在 upstream worked/example/raw。新手建議：
+graphify extract ./raw --code-only
+# 然後試：
+graphify query "什麼直接呼叫 storage？"
+graphify path "parser" "processor"
+graphify explain "api.py"</code></pre>
+</div>
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div></body></html>

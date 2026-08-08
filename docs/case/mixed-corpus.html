@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>案例：mixed-corpus · Graphify 繁中教學站</title>
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="../code/index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="../worked.html">← 實作案例</a></div>
+<header>
+<h1>案例：mixed-corpus</h1>
+<div class="subtitle">Python + markdown 論文 + 圖片——混合輸入的處理</div>
+<div class="badge-line">來源：上游 worked/mixed-corpus · 圖資料沿用上游 · 我們重新分群</div>
+</header>
+<div class="guide">
+<h2>案例簡介</h2>
+<p>一個小型的混合輸入語料：3 個 Python 模組 + 一篇帶 arXiv 引用的論文筆記 + 一張圖。測試 graphify 對不同檔案型別在同一次 run 的處理——包括 <code>attention_notes.md</code> 被偵測為「paper」（arXiv 啟發式命中 <code>1706.03762</code>）。</p>
+<p>圖資料沿用上游（含論文節點），我們用 graphify 0.9.36 重新分群並產生互動圖。</p>
+<h2>我們怎麼跑的</h2>
+<pre><code># 完整重現需 LLM key（markdown + 圖片要語意抽取）
+graphify extract ./raw
+
+# 本站做法：從上游 graph.json 重新分群
+python scripts/gen-case-html.py graph.json graph.html GRAPH_REPORT.md
+
+# 或只用程式碼部分（零 key）：
+graphify extract ./raw --code-only</code></pre>
+<h2>互動知識圖譜</h2>
+<p>22 個節點的小圖——三模組 + 論文節點。</p>
+<div class="graph-embed">
+  <div class="graph-embed-bar">
+    <span class="g-title">mixed-corpus 知識圖譜（中文界面）</span>
+    <span class="g-links">
+      <a href="../../worked/mixed-corpus/graph-zh.html" target="_blank">開新分頁 ↗</a>
+      <a href="../../worked/mixed-corpus/graph.html" target="_blank">英文版 ↗</a>
+    </span>
+  </div>
+  <iframe src="../../worked/mixed-corpus/graph-zh.html" title="mixed-corpus 知識圖譜（中文界面）"></iframe>
+</div>
+<h2>我們的數字</h2>
+<table><tr><th>指標</th><th>本站結果</th></tr><tr><td>節點數</td><td><code>22</code></td></tr><tr><td>邊數</td><td><code>38</code></td></tr><tr><td>社群數</td><td><code>4</code></td></tr><tr><td>EXTRACTED 邊</td><td><code>50%</code></td></tr><tr><td>INFERRED 邊</td><td><code>50%</code></td></tr></table>
+<p class="hint">小圖 INFERRED 比例高（19 條），因為模組間互相 import 的解析占了主體。</p>
+<h2>God Nodes 解說</h2>
+<ol><li><code>_cross_file_surprises()</code> — 7 條邊</li><li><code>_is_file_node()</code> — 5 條邊</li><li><code>_cross_community_surprises()</code> — 5 條邊</li><li><code>_node_community_map()</code> — 4 條邊</li><li><code>_is_concept_node()</code> — 4 條邊</li><li><code>_surprise_score()</code> — 4 條邊</li><li><code>suggest_questions()</code> — 4 條邊</li><li><code>god_nodes()</code> — 3 條邊</li><li><code>surprising_connections()</code> — 3 條邊</li><li><code>_file_category()</code> — 2 條邊</li></ol><p>有趣的是：這裡的 god nodes 全是 analyze.py 的內部函數——因為語料本身就是「圖分析」模組（<code>analyze.py</code> / <code>build.py</code> / <code>cluster.py</code>），所以圖分析自己的程式碼變成被分析的對象。</p>
+<h2>Surprising Connections 解說</h2>
+<ul>
+<li><code>_surprise_score() --calls--> _cross_file_surprises()</code> — 分析函數互相呼叫的結構被忠實重現。</li>
+</ul>
+<p class="hint">這案例真正的看點是「自我指涉」：用圖分析工具分析圖分析工具的程式碼。</p>
+<h2>重現</h2>
+<pre><code># 語料在 upstream worked/mixed-corpus/raw。完整版需 LLM key。</code></pre>
+</div>
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div></body></html>

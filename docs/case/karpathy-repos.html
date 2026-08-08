@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>案例：karpathy-repos · Graphify 繁中教學站</title>
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="../code/index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="../worked.html">← 實作案例</a></div>
+<header>
+<h1>案例：karpathy-repos</h1>
+<div class="subtitle">nanoGPT / minGPT / micrograd + 5 篇論文 + 4 張圖——71.5× 基準語料</div>
+<div class="badge-line">來源：上游 worked/karpathy-repos · 圖資料沿用上游 · 我們重新分群</div>
+</header>
+<div class="guide">
+<h2>案例簡介</h2>
+<p>這是產出 <strong>71.5× token 節省</strong> 基準的語料：三個 Karpathy 的知名 repo（nanoGPT、minGPT、micrograd）+ 5 篇論文 PDF + 4 張圖。它展示了跨 repo 的符號連結與論文橋接。</p>
+<p>本案例我們採用<strong>上游已提交的圖資料</strong>（<code>worked/karpathy-repos/graph.json</code>，包含論文與圖片節點的完整圖），用 graphify 0.9.36 重新分群並產生互動圖。</p>
+<h2>我們怎麼跑的</h2>
+<pre><code># 重現完整版（需 LLM key 處理論文/圖片）
+git clone https://github.com/karpathy/nanoGPT
+git clone https://github.com/karpathy/minGPT
+git clone https://github.com/karpathy/micrograd
+# + 下載 5 篇論文 PDF + 4 張圖，全部放進 raw/
+graphify extract ./raw
+
+# 本站做法：從上游 graph.json 重新分群（無需 LLM）
+python scripts/gen-case-html.py graph.json graph.html GRAPH_REPORT.md</code></pre>
+<h2>互動知識圖譜</h2>
+<p>三個 repo 的程式碼 + 論文與圖片節點組成的圖。</p>
+<div class="graph-embed">
+  <div class="graph-embed-bar">
+    <span class="g-title">karpathy-repos 知識圖譜（中文界面）</span>
+    <span class="g-links">
+      <a href="../../worked/karpathy-repos/graph-zh.html" target="_blank">開新分頁 ↗</a>
+      <a href="../../worked/karpathy-repos/graph.html" target="_blank">英文版 ↗</a>
+    </span>
+  </div>
+  <iframe src="../../worked/karpathy-repos/graph-zh.html" title="karpathy-repos 知識圖譜（中文界面）"></iframe>
+</div>
+<h2>我們的數字</h2>
+<table><tr><th>指標</th><th>本站結果</th></tr><tr><td>節點數</td><td><code>177</code></td></tr><tr><td>邊數</td><td><code>246</code></td></tr><tr><td>社群數</td><td><code>16</code></td></tr><tr><td>EXTRACTED 邊</td><td><code>83%</code></td></tr><tr><td>INFERRED 邊</td><td><code>17%</code></td></tr></table>
+<p class="hint">我們重新分群的結果（上游原始圖略大）。14 個社群顯示、2 個過薄省略。</p>
+<h2>God Nodes 解說</h2>
+<ol><li><code>Value</code> — 15 條邊</li><li><code>GPT</code> — 9 條邊</li><li><code>Layer</code> — 8 條邊</li><li><code>Neuron</code> — 7 條邊</li><li><code>Encoder</code> — 7 條邊</li><li><code>CfgNode</code> — 7 條邊</li><li><code>AdditionDataset</code> — 7 條邊</li></ol><p>完全合理：<code>Value</code>（micrograd 的自動微分核心）與 <code>GPT</code> / <code>Layer</code> / <code>Neuron</code> / <code>Encoder</code>（nanoGPT 的 transformer 元件）就是這批語料的真正抽象核心。</p>
+<h2>Surprising Connections 解說</h2>
+<p>跨 repo 的驚喜連線（上游報告的亮點）：</p>
+<ul>
+<li>nanoGPT 與 minGPT 的 <code>Block</code> 元件跨 repo 相連——兩個 repo 實現同一套 transformer 概念。</li>
+<li>FlashAttention 論文橋進兩個 repo 的 <code>CausalSelfAttention</code>——論文與程式碼的語意對應。</li>
+</ul>
+<p class="hint">這就是「論文節點連到程式碼節點」的價值：讀論文時直接看到它在程式碼裡的落點。</p>
+<h2>重現</h2>
+<pre><code># 程式碼部分可用 --code-only 零 key 重跑：
+mkdir raw && git clone https://github.com/karpathy/nanoGPT raw/nanoGPT
+git clone https://github.com/karpathy/minGPT raw/minGPT
+git clone https://github.com/karpathy/micrograd raw/micrograd
+graphify extract ./raw --code-only</code></pre>
+</div>
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div></body></html>

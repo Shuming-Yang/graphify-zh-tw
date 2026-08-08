@@ -43,6 +43,9 @@ body {
 
 a { color: var(--cyan); text-decoration: none; border-bottom: 1px dotted rgba(34, 211, 238, 0.4); }
 a:hover { color: #7be7fb; border-bottom-color: var(--cyan); }
+/* 卡片/節點類：是連結但不要虛線底（保留各自 border） */
+a.entry-card, a.card, a.case-card, a.cm-node, a.about-card { border-bottom: none; }
+a.entry-card:hover, a.card:hover, a.case-card:hover, a.cm-node:hover { border-bottom: none; }
 
 ::selection { background: rgba(34, 211, 238, 0.28); }
 

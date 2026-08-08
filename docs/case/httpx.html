@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>案例：httpx · Graphify 繁中教學站</title>
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="../code/index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="../worked.html">← 實作案例</a></div>
+<header>
+<h1>案例：httpx（本站全跑）</h1>
+<div class="subtitle">6 個純 Python 檔的合成函式庫——我們從零到整跑完一次</div>
+<div class="badge-line">本站全跑 · graphify 0.9.36 · 純程式碼語料 · 零 API key</div>
+</header>
+<div class="guide">
+<h2>案例簡介</h2>
+<p>仿照 <a href="https://github.com/encode/httpx">httpx</a> 架構的合成 Python 函式庫：exceptions → models → auth/transport → client 的乾淨分層。這是<strong>我們從頭到尾自己跑完</strong>的案例——6 個檔案全是程式碼，所以 <code>graphify extract</code> 全程本機、<strong>不需要任何 API key</strong>。</p>
+<h2>我們怎麼跑的</h2>
+<pre><code># 本站完整重現（純程式碼，零 API key）
+graphify extract ./raw      # 193 節點 · 456 邊 · 6 社群
+graphify cluster-only ./raw # 生成報告與互動圖</code></pre>
+<h2>互動知識圖譜</h2>
+<p>小語料圖的結構價值：一眼看清分層與依賴。</p>
+<div class="graph-embed">
+  <div class="graph-embed-bar">
+    <span class="g-title">httpx 知識圖譜（中文界面）</span>
+    <span class="g-links">
+      <a href="../../worked/httpx/graph-zh.html" target="_blank">開新分頁 ↗</a>
+      <a href="../../worked/httpx/graph.html" target="_blank">英文版 ↗</a>
+    </span>
+  </div>
+  <iframe src="../../worked/httpx/graph-zh.html" title="httpx 知識圖譜（中文界面）"></iframe>
+</div>
+<h2>我們的數字</h2>
+<table><tr><th>指標</th><th>本站結果</th></tr><tr><td>節點數</td><td><code>193</code></td></tr><tr><td>邊數</td><td><code>456</code></td></tr><tr><td>社群數</td><td><code>6</code></td></tr><tr><td>EXTRACTED 邊</td><td><code>76%</code></td></tr><tr><td>INFERRED 邊</td><td><code>24%</code></td></tr></table>
+<p class="hint">INFERRED 110 條邊，平均信賴 0.5。0 token 成本。</p>
+<h2>God Nodes 解說</h2>
+<ol><li><code>Response</code> — 55 條邊</li><li><code>Request</code> — 43 條邊</li><li><code>Client</code> — 27 條邊</li><li><code>AsyncClient</code> — 26 條邊</li><li><code>BaseTransport</code> — 20 條邊</li><li><code>HTTPTransport</code> — 20 條邊</li><li><code>BaseClient</code> — 19 條邊</li><li><code>Cookies</code> — 19 條邊</li><li><code>AsyncHTTPTransport</code> — 18 條邊</li><li><code>TransportError</code> — 16 條邊</li></ol><p>核心抽象完全正確：<code>Request</code> / <code>Response</code> 是 HTTP 訊息的兩端（度數最高），<code>Client</code> / <code>AsyncClient</code> / <code>BaseClient</code> 是同步/非同步 API 面，<code>BaseTransport</code> / <code>HTTPTransport</code> 是傳輸層。</p>
+<h2>Surprising Connections 解說</h2>
+<ul>
+<li><code>Auth --uses--> Response</code> — 認證處理器用到了 Response（解析 <code>WWW-Authenticate</code> 標頭）。</li>
+<li><code>Client / AsyncClient / BaseClient --uses--> Auth</code> — 三個 client 都依賴認證抽象。</li>
+</ul>
+<p class="hint">這些 <code>INFERRED</code> 邊顯示「client 依賴 auth、auth 依賴 response」的隱含耦合——檔案層次看不出來，圖上一目了然。</p>
+<h2>重現</h2>
+<pre><code># 語料在 upstream worked/httpx/raw，6 個 .py 檔。
+# 本站產出：worked/httpx/graph.html · GRAPH_REPORT.md
+graphify benchmark worked/httpx/graph.json   # 驗證 token 節省</code></pre>
+</div>
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div></body></html>

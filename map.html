@@ -35,11 +35,11 @@
 <p>不只是程式碼。Graphify 接受程式碼、文件、PDF、圖片、影音，全部進同一張圖：</p>
 <div class="concept-map">
   <div class="cm-row">
-    <span class="cm-node service"><span class="label">程式碼</span><span class="tag">36 種 tree-sitter 文法 · 本機解析 · 零 LLM</span></span>
-    <span class="cm-node on-ramp"><span class="label">文件</span><span class="tag">.md / .txt / .html · markdown 連結成邊</span></span>
-    <span class="cm-node on-ramp"><span class="label">PDF / 論文</span><span class="tag">需 LLM 語意抽取</span></span>
-    <span class="cm-node on-ramp"><span class="label">圖片 / 影音</span><span class="tag">影片本機轉錄（faster-whisper）</span></span>
-    <span class="cm-node meta"><span class="label">SQL / 資料庫</span><span class="tag">表格、view、外鍵、JOIN 關係</span></span>
+    <a class="cm-node service" href="docs/how-it-works.html"><span class="label">程式碼</span><span class="tag">36 種 tree-sitter 文法 · 本機解析 · 零 LLM</span></a>
+    <a class="cm-node on-ramp" href="docs/how-it-works.html"><span class="label">文件</span><span class="tag">.md / .txt / .html · markdown 連結成邊</span></a>
+    <a class="cm-node on-ramp" href="docs/how-it-works.html"><span class="label">PDF / 論文</span><span class="tag">需 LLM 語意抽取</span></a>
+    <a class="cm-node on-ramp" href="docs/how-it-works.html"><span class="label">圖片 / 影音</span><span class="tag">影片本機轉錄（faster-whisper）</span></a>
+    <a class="cm-node meta" href="docs/how-it-works.html"><span class="label">SQL / 資料庫</span><span class="tag">表格、view、外鍵、JOIN 關係</span></a>
   </div>
 </div>
 
@@ -47,19 +47,19 @@
 <p>來源：<a href="docs/architecture.html">ARCHITECTURE.md</a>。每個階段是一個獨立模組、一個函數，透過純 dict / NetworkX 圖溝通：</p>
 <div class="concept-map">
   <div class="cm-row">
-    <span class="cm-node"><span class="label">detect()</span><span class="tag">收集檔案</span><span class="pill">detect.py</span></span>
+    <a class="cm-node" href="docs/code/pipeline.html"><span class="label">detect()</span><span class="tag">收集檔案</span><span class="pill">detect.py</span></a>
     <span class="cm-arrow">→</span>
-    <span class="cm-node"><span class="label">extract()</span><span class="tag">AST 抽取</span><span class="pill">extract.py</span></span>
+    <a class="cm-node" href="docs/code/pipeline.html"><span class="label">extract()</span><span class="tag">AST 抽取</span><span class="pill">extract.py</span></a>
     <span class="cm-arrow">→</span>
-    <span class="cm-node"><span class="label">build_graph()</span><span class="tag">組圖</span><span class="pill">build.py</span></span>
+    <a class="cm-node" href="docs/code/pipeline.html"><span class="label">build_graph()</span><span class="tag">組圖</span><span class="pill">build.py</span></a>
     <span class="cm-arrow">→</span>
-    <span class="cm-node"><span class="label">cluster()</span><span class="tag">社群偵測</span><span class="pill">cluster.py</span></span>
+    <a class="cm-node" href="docs/code/pipeline.html"><span class="label">cluster()</span><span class="tag">社群偵測</span><span class="pill">cluster.py</span></a>
     <span class="cm-arrow">→</span>
-    <span class="cm-node"><span class="label">analyze()</span><span class="tag">god-node 分析</span><span class="pill">analyze.py</span></span>
+    <a class="cm-node" href="docs/code/pipeline.html"><span class="label">analyze()</span><span class="tag">god-node 分析</span><span class="pill">analyze.py</span></a>
     <span class="cm-arrow">→</span>
-    <span class="cm-node"><span class="label">report()</span><span class="tag">報告</span><span class="pill">report.py</span></span>
+    <a class="cm-node" href="docs/code/pipeline.html"><span class="label">report()</span><span class="tag">報告</span><span class="pill">report.py</span></a>
     <span class="cm-arrow">→</span>
-    <span class="cm-node"><span class="label">export()</span><span class="tag">輸出</span><span class="pill">export.py</span></span>
+    <a class="cm-node" href="docs/code/pipeline.html"><span class="label">export()</span><span class="tag">輸出</span><span class="pill">export.py</span></a>
   </div>
   <div class="cm-caption">每個階段都只寫進 <code>graphify-out/</code>，沒有共享狀態、沒有副作用</div>
 </div>
@@ -68,9 +68,9 @@
 <p>圖的格式是 NetworkX 的 node-link 結構（<code>graph.json</code>）：</p>
 <div class="concept-map">
   <div class="cm-row">
-    <span class="cm-node"><span class="label">Node 節點</span><span class="tag">id · label · file_type · source_file</span><span class="pill">code / document / paper / image / rationale</span></span>
-    <span class="cm-node"><span class="label">Edge 邊</span><span class="tag">source → target · relation · confidence</span><span class="pill">calls / imports / uses / references…</span></span>
-    <span class="cm-node meta"><span class="label">Hyperedge 超邊</span><span class="tag">連接 3+ 節點的群組關係</span><span class="pill">G.graph["hyperedges"]</span></span>
+    <a class="cm-node" href="docs/how-it-works.html"><span class="label">Node 節點</span><span class="tag">id · label · file_type · source_file</span><span class="pill">code / document / paper / image / rationale</span></a>
+    <a class="cm-node" href="docs/how-it-works.html"><span class="label">Edge 邊</span><span class="tag">source → target · relation · confidence</span><span class="pill">calls / imports / uses / references…</span></a>
+    <a class="cm-node meta" href="docs/how-it-works.html"><span class="label">Hyperedge 超邊</span><span class="tag">連接 3+ 節點的群組關係</span><span class="pill">G.graph["hyperedges"]</span></a>
   </div>
 </div>
 
@@ -96,8 +96,8 @@
 <h2>4. 社群偵測：Leiden 演算法</h2>
 <div class="concept-map">
   <div class="cm-row">
-    <span class="cm-node service"><span class="label">Community 社群</span><span class="tag">Leiden 演算法依邊密度分群 · 不需 embedding</span></span>
-    <span class="cm-node"><span class="label">God node</span><span class="tag">度數最高的節點——「所有東西都流經它」</span></span>
+    <a class="cm-node service" href="docs/how-it-works.html"><span class="label">Community 社群</span><span class="tag">Leiden 演算法依邊密度分群 · 不需 embedding</span></a>
+    <a class="cm-node" href="docs/how-it-works.html"><span class="label">God node</span><span class="tag">度數最高的節點——「所有東西都流經它」</span></a>
   </div>
 </div>
 <p>Leiden 是把「彼此之間連線很密的節點」歸成同一群的圖分群方法。Graphify 不需要 embedding 或向量資料庫——Claude 抽出的語意相似邊（<code>semantically_similar_to</code>）本身就已經是圖的一部分，圖的結構就是相似度訊號。</p>
@@ -106,9 +106,9 @@
 <p>圖建好之後，取代「讀原始檔」的就是這三件事：</p>
 <div class="concept-map">
   <div class="cm-row">
-    <span class="cm-node"><span class="label">graphify query "…"</span><span class="tag">用自然語言問問題，回傳局部子圖</span></span>
-    <span class="cm-node"><span class="label">graphify path A B</span><span class="tag">追蹤兩件事之間的最短路徑</span></span>
-    <span class="cm-node"><span class="label">graphify explain X</span><span class="tag">解釋一個節點與它的鄰居</span></span>
+    <a class="cm-node" href="docs/code/cli.html"><span class="label">graphify query "…"</span><span class="tag">用自然語言問問題，回傳局部子圖</span></a>
+    <a class="cm-node" href="docs/code/cli.html"><span class="label">graphify path A B</span><span class="tag">追蹤兩件事之間的最短路徑</span></a>
+    <a class="cm-node" href="docs/code/cli.html"><span class="label">graphify explain X</span><span class="tag">解釋一個節點與它的鄰居</span></a>
   </div>
 </div>
 <p>實際輸出的長相（README 的範例）：</p>
@@ -131,10 +131,10 @@ Shortest path (3 hops):
 <h2>6. 產出檔案</h2>
 <div class="concept-map">
   <div class="cm-row">
-    <span class="cm-node"><span class="label">graph.json</span><span class="tag">完整圖資料（NetworkX node-link）</span></span>
-    <span class="cm-node"><span class="label">GRAPH_REPORT.md</span><span class="tag">god nodes、surprising connections、建議問題</span></span>
-    <span class="cm-node"><span class="label">graph.html</span><span class="tag">可互動的力導向圖（可在瀏覽器點擊）</span></span>
-    <span class="cm-node meta"><span class="label">cache/</span><span class="tag">SHA256 內容快取，重跑只處理變更</span></span>
+    <a class="cm-node" href="docs/code/export.html"><span class="label">graph.json</span><span class="tag">完整圖資料（NetworkX node-link）</span></a>
+    <a class="cm-node" href="docs/code/export.html"><span class="label">GRAPH_REPORT.md</span><span class="tag">god nodes、surprising connections、建議問題</span></a>
+    <a class="cm-node" href="docs/code/export.html"><span class="label">graph.html</span><span class="tag">可互動的力導向圖（可在瀏覽器點擊）</span></a>
+    <a class="cm-node meta" href="docs/code/export.html"><span class="label">cache/</span><span class="tag">SHA256 內容快取，重跑只處理變更</span></a>
   </div>
 </div>
 <p>所有產出都放在 <code>graphify-out/</code>，可 commit 進 git 讓整個團隊共享——每個人都直接讀圖，不用重新建。</p>

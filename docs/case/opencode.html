@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>案例：OpenCode · Graphify 繁中教學站</title>
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="../code/index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="../worked.html">← 實作案例</a></div>
+<header>
+<h1>案例：OpenCode 核心 CLI</h1>
+<div class="subtitle">用 graphify 分析「我們正在用來建站的工具」本身</div>
+<div class="badge-line">來源：anomalyco/opencode · packages/opencode · 版本釘選 opencode@1.18.15 @ fe82a1b6 · 分析日期 2026-08-08</div>
+</header>
+<div class="guide">
+<h2>案例簡介</h2>
+<p>這是本站的<strong>旗艦案例</strong>。我們用 graphify 分析了 <a href="https://github.com/anomalyco/opencode">OpenCode</a>（開源 AI 程式碼代理，194K+ stars）的核心套件 <code>packages/opencode</code>——也就是「我們正在用 OpenCode 建這個 graphify 教學站」這件事的 meta 版本。</p>
+<p>語料：<code>packages/opencode/src</code> 的 <strong>363 個 TypeScript 檔</strong>（docstring、規格、測試以外的核心原始碼）。TypeScript 是程式碼，所以 <code>--code-only</code> 就能全程在本機用 tree-sitter 解析，<strong>不需要任何 API key</strong>。</p>
+<h2>我們怎麼跑的</h2>
+<pre><code># 1. 淺 clone + sparse checkout（只抓需要的套件）
+git clone --depth 1 --branch dev --filter=blob:none --sparse \
+  https://github.com/anomalyco/opencode.git
+git sparse-checkout set packages/opencode
+
+# 2. code-only 抽取（零 API key，純本機 AST）
+graphify extract packages/opencode/src --code-only
+
+# 3. 分群 + 生成報告與互動圖
+graphify cluster-only .</code></pre>
+<div class="callout"><strong>版本釘選</strong>：本次分析對齊 <code>dev</code> 分支 commit <code>fe82a1b6</code>，套件版本 <code>opencode@1.18.15</code>，分析日期 2026-08-08。OpenCode 是活躍開發的專案，數據會隨版本演進而變。</div>
+<h2>互動知識圖譜</h2>
+<p>以下為本次分析的真實產出——3903 個節點，可以直接拖曳、搜尋、點節點看資訊。節點名稱是程式識別符，兩版皆保留英文；僅 UI 界面中文化。</p>
+<div class="graph-embed">
+  <div class="graph-embed-bar">
+    <span class="g-title">OpenCode 核心 CLI 知識圖譜（中文界面）</span>
+    <span class="g-links">
+      <a href="../../worked/opencode/graph-zh.html" target="_blank">開新分頁 ↗</a>
+      <a href="../../worked/opencode/graph.html" target="_blank">英文版 ↗</a>
+    </span>
+  </div>
+  <iframe src="../../worked/opencode/graph-zh.html" title="OpenCode 核心 CLI 知識圖譜（中文界面）"></iframe>
+</div>
+<h2>我們的數字</h2>
+<table><tr><th>指標</th><th>本站結果</th></tr><tr><td>節點數</td><td><code>3903</code></td></tr><tr><td>邊數</td><td><code>8701</code></td></tr><tr><td>社群數</td><td><code>159</code></td></tr><tr><td>EXTRACTED 邊</td><td><code>98%</code></td></tr><tr><td>INFERRED 邊</td><td><code>2%</code></td></tr></table>
+<p class="hint">0 個 token 成本（純 AST 抽取）。INFERRED 平均信賴 0.62。</p>
+<h2>God Nodes 解說</h2>
+<ol><li><code>RunFooter</code> — 66 條邊</li><li><code>Filesystem</code> — 50 條邊</li><li><code>InstanceState</code> — 44 條邊</li><li><code>SessionID</code> — 43 條邊</li><li><code>reduceSessionData()</code> — 39 條邊</li><li><code>Config</code> — 39 條邊</li><li><code>createLayer()</code> — 38 條邊</li><li><code>Session</code> — 34 條邊</li><li><code>EventV2Bridge</code> — 31 條邊</li><li><code>Provider</code> — 31 條邊</li></ol><p>高度合理的 god nodes：<code>Session</code> / <code>InstanceState</code> / <code>SessionID</code> 是 agent 對話狀態的核心；<code>Config</code> 是設定樞紐；<code>Provider</code> 是模型供應商抽象；<code>Filesystem</code> 是檔案系統抽象。<code>RunFooter</code> 度數最高，是 TUI 畫面底部組件的結構樞紐。</p>
+<h2>Surprising Connections 解說</h2>
+<p>最有意思的推論邊（全部 <code>INFERRED</code>，平均信賴 0.62）：</p>
+<ul>
+<li><code>routeHttpApiWorkspace() --indirect_call--> plan()</code> — HTTP API 的 workspace 路由中介層，間接呼叫到 session 的 <code>plan()</code>。跨 <code>server/…/middleware/</code> 到 <code>session/</code>，揭露了 API 層與 agent 規劃層的耦合。</li>
+<li><code>make() --indirect_call--> loaded() / messages() / model()</code> — <code>acp/service.ts</code> 的建構函數間接觸發了 session 指令載入與 LLM native request。間接呼叫解析（<code>indirect_call</code>）抓到的跨檔呼叫，正是純檔案搜索看不到的部分。</li>
+</ul>
+<p class="hint">這些 <code>indirect_call</code> 邊的價值在於：它們是 graphify 的跨檔解析（第二遍）從 AST 推出的，不需要讀原始檔——「用圖取代 grep」的最佳示範。</p>
+<h2>社群樣貌</h2>
+<p>159 個社群。最大的社群（76 節點）以 <code>session/prompt.ts</code> 為 hub（agent 的 prompt 組裝層），其次 <code>run/types.ts</code>（執行類型）。TUI、provider、httpapi 各自形成獨立社群——架構分層清楚可見。</p>
+<h2>重現</h2>
+<pre><code># 依上述步驟即可完全重現。產出對照：
+# worked/opencode/graph.html（互動圖）· GRAPH_REPORT.md（報告）
+graphify benchmark worked/opencode/graph.json  # 若想量 token 節省</code></pre>
+</div>
+<footer>
+  <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
+</footer>
+</div></body></html>
