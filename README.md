@@ -165,3 +165,4 @@ python3 -m http.server 8000   # 本機預覽
 - PyPI 套件：`graphifyy`（雙 y）→ CLI 指令為 `graphify`
 - 本站 repo：[Shuming-Yang/graphify-zh-tw](https://github.com/Shuming-Yang/graphify-zh-tw)
 - 本站上線：[shuming-yang.github.io/graphify-zh-tw](https://shuming-yang.github.io/graphify-zh-tw/)
+- 學習路徑建議服務：[learning-path-advisor](https://shuming-yang.github.io/learning-path-advisor/) — 依角色推薦教學網站學習路徑
