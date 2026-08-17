@@ -347,6 +347,62 @@
 <p class="hint">相關：<a href="extractors.html">extractors 語言抽取器</a> · <a href="../incremental.html">增量更新設計</a> · <a href="../../map.html">概念地圖</a></p>
 </div>
 
+
+<!-- Tutorial Sections (教學補強) -->
+
+<style>
+.tutorial-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid var(--accent, #4a9eff); }
+.tutorial-section h2 { margin-top: 0; color: var(--accent, #4a9eff); font-size: 1.3rem; }
+.tutorial-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.tutorial-section th, .tutorial-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.tutorial-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.tutorial-section ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+.tutorial-section li { margin: 0.25rem 0; }
+.tutorial-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.tutorial-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="tutorial-section">
+
+<h2>教學解說</h2>
+<p>主線 pipeline 是 Graphify 的脊椎：<strong>detect → extract → build → cluster</strong>。每個階段都是自己模組裡的一個函數，用純 Python dict 與 NetworkX 圖溝通。</p>
+<p>detect.py 負責收集檔案並過濾（1996 行）、extract.py 負責 tree-sitter AST 抽取（5993 行，最大模組）、build.py 負責併入 NetworkX 圖（1943 行）、cluster.py 負責 Leiden 社群偵測（320 行，最簡單）。</p>
+<p>關鍵設計：沒有共享狀態，除了 <code>graphify-out/</code> 之外沒有副作用。這讓每個模組都可以獨立測試。</p>
+
+
+<h2>Worked Example：觀察 pipeline 的中間產物</h2>
+<ol>
+<li><strong>執行 detect</strong>：<code>graphify detect my-project/</code>，查看 <code>.graphify_detect.json</code> 的內容。</li>
+<li><strong>執行 extract</strong>：<code>graphify extract my-project/ --verbose</code>，觀察每個階段的輸出。</li>
+<li><strong>檢查中間檔</strong>：查看 <code>graphify-out/</code> 下的暫存檔（如果有的話）。</li>
+<li><strong>比較前後</strong>：比較 detect 前後的目錄結構。</li>
+</ol>
+<div class="callout info"><strong>關鍵觀察</strong>：每個階段的輸出都是下一個階段的輸入，形成清晰的資料流。</div>
+
+
+<h2>常見錯誤與診斷</h2>
+<table>
+<tr><th>錯誤訊息</th><th>原因</th><th>解決方式</th></tr>
+<tr><td><code>detect: permission denied</code></td><td>無法讀取某些目錄</td><td>檢查檔案權限或用 <code>sudo</code> 執行</td></tr>
+<tr><td><code>extract: tree-sitter parse error</code></td><td>語法錯誤或不支援的語法</td><td>檢查檔案是否完整，或語法是否在支援列表中</td></tr>
+<tr><td><code>build: duplicate node ID</code></td><td>多個檔案產生相同的節點 ID</td><td>這是 0.9.0 修掉的問題，升級 graphify</td></tr>
+<tr><td><code>cluster: too few nodes</code></td><td>圖中節點太少無法分群</td><td>這是正常的，小圖可能只有 1 個社群</td></tr>
+</table>
+
+
+<h2>練習與驗收清單</h2>
+<ul>
+<li>[ ] 能解釋 detect.py 的 collect_files 如何過濾檔案</li>
+<li>[ ] 能說明 extract.py 中 tree-sitter 的作用</li>
+<li>[ ] 能解釋 build.py 如何併入 NetworkX 圖</li>
+<li>[ ] 能說明 cluster.py 的 Leiden 演算法如何運作</li>
+<li>[ ] 能找到至少 2 個模組的輸入/輸出格式</li>
+<li>[ ] 能解釋「沒有共享狀態」的設計優點</li>
+</ul>
+
+</div>
+<!-- End Tutorial Sections -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

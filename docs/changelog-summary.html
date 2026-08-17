@@ -67,6 +67,61 @@
 <div class="callout info"><strong>教學角度</strong>：這份 CHANGELOG 是很好的「開源專案成長史」教材——看它怎麼從單一平台的個人工具，演進到多平台、多語料、多人協作的產品。特別值得注意 0.9.0 的 breaking change：<strong>節點 ID 是資料</strong>，改 ID 格式會影響所有下游（Neo4j、GraphML、MCP）。</div>
 </div>
 
+
+<!-- Tutorial Sections (教學補強) -->
+
+<style>
+.tutorial-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid var(--accent, #4a9eff); }
+.tutorial-section h2 { margin-top: 0; color: var(--accent, #4a9eff); font-size: 1.3rem; }
+.tutorial-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.tutorial-section th, .tutorial-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.tutorial-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.tutorial-section ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+.tutorial-section li { margin: 0.25rem 0; }
+.tutorial-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.tutorial-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="tutorial-section">
+
+<h2>教學解說</h2>
+<p>這份 CHANGELOG 摘要展示了「<strong>開源專案成長史</strong>」。從 0.1.0 到 0.9.34，約四個月出了 100+ 個版本。關鍵里程碑包括：0.3.0 的多平台化、0.4.0 的影音支援、0.6.0 的 SQL 抽取、0.9.0 的節點 ID 重造。</p>
+<p>主線趨勢很清晰：語言支援從 13 種擴展到 36 種、輸入類型從程式碼擴展到影音/SQL/Office、平台從 Claude Code 擴展到 20+ 平台。這反映了「從個人工具到多平台產品」的演進路徑。</p>
+<p>特別值得注意 0.9.0 的 breaking change：節點 ID 改含完整 repo-relative 路徑。這修掉了「不同目錄同名檔被併成一個節點」的資料流失問題，但也代表所有下游（Neo4j、GraphML、MCP）都需要適配。</p>
+
+
+<h2>Worked Example：追蹤一個功能的演進</h2>
+<ol>
+<li><strong>選擇功能</strong>：選擇一個功能（例如 SQL 抽取），從 CHANGELOG 中找到它首次出現的版本（0.6.0）。</li>
+<li><strong>查看原始實作</strong>：在對應版本的 commit 中找到 <code>extract.py</code> 的 SQL 抽取器實作。</li>
+<li><strong>追蹤後續修復</strong>：在後續版本中找到 SQL 相關的 bug fix（例如 0.9.x 的精密修復）。</li>
+<li><strong>比較前後</strong>：比較 0.6.0 與最新版本的 SQL 抽取器差異。</li>
+</ol>
+<div class="callout info"><strong>關鍵觀察</strong>：每個版本都有詳細的 issue 編號與 contributor 感謝，這是開源專案透明度的體現。</div>
+
+
+<h2>常見錯誤與診斷</h2>
+<table>
+<tr><th>錯誤訊息</th><th>原因</th><th>解決方式</th></tr>
+<tr><td><code>version mismatch</code></td><td>使用了不同版本的 graphify</td><td>執行 <code>graphify --version</code> 確認版本</td></tr>
+<tr><td><code>breaking change: node ID format</code></td><td>0.9.0 的節點 ID 重造</td><td>執行 <code>graphify extract --migrate</code> 自動遷移</td></tr>
+<tr><td><code>deprecated: old API</code></td><td>使用了已廢棄的 API</td><td>查看 CHANGELOG 找到替代 API</td></tr>
+</table>
+
+
+<h2>練習與驗收清單</h2>
+<ul>
+<li>[ ] 能說出至少 3 個重要里程碑的版本號與內容</li>
+<li>[ ] 能解釋 0.9.0 breaking change 的影響</li>
+<li>[ ] 能說明「節點 ID 是資料」這句話的意思</li>
+<li>[ ] 能追蹤一個功能從首次出現到最新版本的演進</li>
+<li>[ ] 能解釋為什麼早期版本每天多版，中期轉為穩定修 bug</li>
+<li>[ ] 能說明「透明度」在 CHANGELOG 中的體現</li>
+</ul>
+
+</div>
+<!-- End Tutorial Sections -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

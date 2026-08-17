@@ -110,6 +110,64 @@ docker rmi mcp/sqlite:latest</code></pre>
 <div class="callout info"><strong>為什麼這份文件值得教</strong>：它是一份「小而完整的工具 runbook」範本——動機、選型理由（含壞 image 的陷阱）、前置、安裝、驗證、儲存、接線、解除、疑難排解。類似的可重現 step-by-step 寫法，也用在 <a href="worked.html">實作案例</a> 的重現步驟上。</div>
 </div>
 
+
+<!-- Tutorial Sections (教學補強) -->
+
+<style>
+.tutorial-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid var(--accent, #4a9eff); }
+.tutorial-section h2 { margin-top: 0; color: var(--accent, #4a9eff); font-size: 1.3rem; }
+.tutorial-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.tutorial-section th, .tutorial-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.tutorial-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.tutorial-section ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+.tutorial-section li { margin: 0.25rem 0; }
+.tutorial-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.tutorial-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="tutorial-section">
+
+<h2>教學解說</h2>
+<p>這份 runbook 展示了「<strong>如何把一個 MCP server 裝進 Docker MCP Toolkit</strong>」。MCP（Model Context Protocol）是 AI 代理與外部工具溝通的協議，Docker MCP Toolkit 讓你用容器化方式管理多個 MCP server。</p>
+<p>選型理由很重要：catalog 有兩個 SQLite MCP image，但只有一個能動。這反映了「開源工具的可靠性需要實測驗證」的現實。用 <code>SQLite</code>（<code>mcp/sqlite</code>）直到上游修好新 image。</p>
+<p>儲存布局用 Docker named volume，確保資料在容器重啟後仍然存在。這是「無狀態容器 + 有狀態儲存」的標準模式。</p>
+
+
+<h2>Worked Example：從零安裝 SQLite MCP</h2>
+<ol>
+<li><strong>確認 Docker</strong>：執行 <code>docker info</code> 確認 Docker Desktop 執行中。</li>
+<li><strong>安裝 server</strong>：執行 <code>docker mcp profile server add default --server catalog://mcp/docker-mcp-catalog/SQLite</code>。</li>
+<li><strong>拉取 image</strong>：執行 <code>docker pull mcp/sqlite:latest</code>。</li>
+<li><strong>驗證安裝</strong>：執行 <code>docker mcp profile show default</code>，確認看到 SQLite。</li>
+<li><strong>冒煙測試</strong>：執行 <code>docker mcp tools call create_table query='CREATE TABLE IF NOT EXISTS test (id INTEGER PRIMARY KEY, name TEXT)'</code>。</li>
+<li><strong>接進客戶端</strong>：執行 <code>docker mcp client connect claude-code</code>。</li>
+</ol>
+<div class="callout info"><strong>預期結果</strong>：Claude Code 現在可以用 SQLite 工具讀取和寫入資料庫。</div>
+
+
+<h2>常見錯誤與診斷</h2>
+<table>
+<tr><th>錯誤訊息</th><th>原因</th><th>解決方式</th></tr>
+<tr><td><code>starting client: calling "initialize": EOF</code></td><td>MCP handshake 失敗</td><td>直接跑 image 看錯誤：<code>printf '{"jsonrpc":"2.0",...}' | docker run --rm -i mcp/sqlite:latest --db-path /mcp/db.sqlite</code></td></tr>
+<tr><td><code>cannot use --enable-all-servers with --servers flag</code></td><td>兩個 gateway 參數互斥</td><td>選一個參數使用</td></tr>
+<tr><td><code>tools count not increasing</code></td><td>gateway 以 dynamic-tools 執行</td><td>執行 <code>docker mcp tools</code> 或從 MCP session 內呼叫 <code>mcp-activate-profile</code></td></tr>
+<tr><td><code>entrypoint not found</code></td><td>用了壞掉的 sqlite-mcp-server image</td><td>改用 mcp/sqlite:latest</td></tr>
+</table>
+
+
+<h2>練習與驗收清單</h2>
+<ul>
+<li>[ ] 能解釋 MCP 的作用與 Docker MCP Toolkit 的價值</li>
+<li>[ ] 能說明為什麼選 SQLite 而不是 sqlite-mcp-server</li>
+<li>[ ] 能完成安裝、冒煙測試、接進客戶端的完整流程</li>
+<li>[ ] 能解釋 named volume 如何確保資料持久化</li>
+<li>[ ] 能診斷至少一種常見錯誤</li>
+<li>[ ] 能解除安裝並清理資源</li>
+</ul>
+
+</div>
+<!-- End Tutorial Sections -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

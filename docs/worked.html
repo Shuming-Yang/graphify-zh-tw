@@ -145,6 +145,62 @@ graphify extract ./raw     # 純程式碼，不需 API key
 <div class="callout"><strong>進階練習</strong>：跑完 httpx 後，試 <code>graphify path "DigestAuth" "Response"</code> 與 <code>graphify explain "Client"</code>——看輸出的路徑與 <code>[EXTRACTED]/[INFERRED]</code> 標籤，再對照 <code>GRAPH_REPORT.md</code> 的 Surprising Connections，你就實際體驗了「用圖取代 grep」。</div>
 </div>
 
+
+<!-- Tutorial Sections (教學補強) -->
+
+<style>
+.tutorial-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid var(--accent, #4a9eff); }
+.tutorial-section h2 { margin-top: 0; color: var(--accent, #4a9eff); font-size: 1.3rem; }
+.tutorial-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.tutorial-section th, .tutorial-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.tutorial-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.tutorial-section ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+.tutorial-section li { margin: 0.25rem 0; }
+.tutorial-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.tutorial-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="tutorial-section">
+
+<h2>教學解說</h2>
+<p>worked/ 是 Graphify 的「真實產出收藏」。每個資料夾都有 README.md（語料說明 + 重現步驟）、GRAPH_REPORT.md（真實報告）、graph.json、review.md（誠實的成效評估）。這反映了「<strong>可重現性</strong>」的開源精神。</p>
+<p>案例從大到小展示：OpenCode（3903 節點）→ rsl-siege-manager（1886 節點）→ karpathy-repos（177 節點）→ httpx（193 節點）→ mixed-corpus（22 節點）→ example（73 節點）。這讓你可以根據自己的硬體與時間選擇合適的案例。</p>
+<p>互動知識圖譜是真正的 graphify 產出——1.8MB 自含檔，所有資料內嵌，可以直接在瀏覽器中操作。</p>
+
+
+<h2>Worked Example：跑完 httpx 案例</h2>
+<ol>
+<li><strong>進入目錄</strong>：<code>cd worked/httpx</code></li>
+<li><strong>執行抽取</strong>：<code>graphify extract ./raw</code>（純程式碼，不需 API key）</li>
+<li><strong>檢查產出</strong>：查看 <code>graphify-out/</code> 目錄下的三個檔案</li>
+<li><strong>驗證數字</strong>：執行 <code>graphify benchmark worked/httpx/graph.json</code>，確認 README 宣稱的數字</li>
+<li><strong>探索圖</strong>：執行 <code>graphify path "DigestAuth" "Response"</code>，觀察路徑與標籤</li>
+</ol>
+<div class="callout info"><strong>預期結果</strong>：144 節點 / 330 邊 / 6 社群；god nodes = Client、AsyncClient、Response；驚喜連線：DigestAuth 連到 Response。</div>
+
+
+<h2>常見錯誤與診斷</h2>
+<table>
+<tr><th>錯誤訊息</th><th>原因</th><th>解決方式</th></tr>
+<tr><td><code>graph.html: file too large</code></td><td>互動圖超過 1MB</td><td>這是正常的，大型圖的 graph.html 會很大</td></tr>
+<tr><td><code>benchmark: number mismatch</code></td><td>本地跑的結果與 README 不符</td><td>檢查 graphify 版本是否與案例匹配</td></tr>
+<tr><td><code>path: no path found</code></td><td>兩個節點之間沒有路徑</td><td>檢查節點名稱是否正確，或嘗試其他節點對</td></tr>
+</table>
+
+
+<h2>練習與驗收清單</h2>
+<ul>
+<li>[ ] 能跑完至少一個案例（建議從 httpx 開始）</li>
+<li>[ ] 能解釋 GRAPH_REPORT.md 中的 God Nodes 與 Surprising Connections</li>
+<li>[ ] 能用 graphify path 找到兩個節點之間的路徑</li>
+<li>[ ] 能用 graphify explain 理解一個節點的職責</li>
+<li>[ ] 能比較不同案例的 nodes/edges/社群數量</li>
+<li>[ ] 能在互動圖中搜尋節點、查看資訊</li>
+</ul>
+
+</div>
+<!-- End Tutorial Sections -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

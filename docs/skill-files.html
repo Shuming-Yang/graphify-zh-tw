@@ -112,6 +112,62 @@ corpus size. Do not ask the user to narrow. The graph is already built — use i
 <div class="callout"><strong>所以「中文化技能檔」不應該直接改 SKILL.md</strong>：那會被 skillgen 的 byte-diff 檢查打回。本站的做法是「中文講解」，而不是翻譯可安裝的 skill——翻譯會破壞產出管線的 round-trip 一致性。想深入產出機制，見 <a href="code/skillgen.html">程式碼對照 · skillgen</a>。</div>
 </div>
 
+
+<!-- Tutorial Sections (教學補強) -->
+
+<style>
+.tutorial-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid var(--accent, #4a9eff); }
+.tutorial-section h2 { margin-top: 0; color: var(--accent, #4a9eff); font-size: 1.3rem; }
+.tutorial-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.tutorial-section th, .tutorial-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.tutorial-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.tutorial-section ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+.tutorial-section li { margin: 0.25rem 0; }
+.tutorial-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.tutorial-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="tutorial-section">
+
+<h2>教學解說</h2>
+<p>SKILL.md 是 Graphify 的「大腦」——一份寫給 AI 代理看的操作手冊。它的設計重點是「<strong>輕量核心 + 按需載入的 references</strong>」：SKILL.md 本身只講流程，細節放在 <code>references/</code> 側車。</p>
+<p>Fast path 是一個重要的優化：如果 graph.json 已存在且使用者問的是自然語言問題，直接跳過建圖、立刻跑 query。這讓「已建圖」的查詢變得非常快速。</p>
+<p>所有 skill 檔都是 generated artifacts——真正的 source of truth 是 <code>tools/skillgen/fragments/</code>。這意味著不應該直接改 SKILL.md，而應該改 fragments 然後重新產生。</p>
+
+
+<h2>Worked Example：追蹤 skill 檔的產生流程</h2>
+<ol>
+<li><strong>查看 fragments</strong>：瀏覽 <code>tools/skillgen/fragments/</code> 目錄，查看原始片段。</li>
+<li><strong>執行 skillgen</strong>：執行 <code>python -m tools.skillgen</code>，觀察產生的各平台 SKILL.md。</li>
+<li><strong>比較差異</strong>：用 <code>--check</code> 檢查有沒有 drift（<code>python -m tools.skillgen --check</code>）。</li>
+<li><strong>更新 baseline</strong>：如果修改了 fragments，執行 <code>--bless</code> 更新 baseline。</li>
+</ol>
+<div class="callout info"><strong>關鍵觀察</strong>：各平台的 skill 檔幾乎相同，差異在「always-on 機制」與「安裝位置」。</div>
+
+
+<h2>常見錯誤與診斷</h2>
+<table>
+<tr><th>錯誤訊息</th><th>原因</th><th>解決方式</th></tr>
+<tr><td><code>skillgen: drift detected</code></td><td>SKILL.md 與 fragments 不同步</td><td>執行 <code>python -m tools.skillgen</code> 重新產生</td></tr>
+<tr><td><code>skill: not found</code></td><td>skill 未安裝到正確位置</td><td>執行 <code>graphify install --platform opencode</code></td></tr>
+<tr><td><code>references: load failed</code></td><td>references/ 目錄缺失</td><td>重新安裝 skill 或手動複製 references/</td></tr>
+<tr><td><code>description: too long</code></td><td>description 超過平台限制</td><td>縮短 description 或使用更精確的關鍵字</td></tr>
+</table>
+
+
+<h2>練習與驗收清單</h2>
+<ul>
+<li>[ ] 能解釋 SKILL.md 的 frontmatter 兩個欄位的作用</li>
+<li>[ ] 能說出 Step 0-9 的名稱與職責</li>
+<li>[ ] 能解釋 Fast path 的觸發條件</li>
+<li>[ ] 能列出 references/ 中至少 4 個檔案的用途</li>
+<li>[ ] 能說明為什麼不應該直接改 SKILL.md</li>
+<li>[ ] 能執行 skillgen 並檢查 drift</li>
+</ul>
+
+</div>
+<!-- End Tutorial Sections -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

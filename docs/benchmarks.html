@@ -131,6 +131,63 @@ python crosstool/run.py --repo erpnext --max-spend &lt;budget&gt;</code></pre>
 <div class="callout warn"><strong>提醒</strong>：這些是上游自測的數字（self-reported benchmark），公開的 harness 與裁判引述讓它可稽核、可重現，但引用時記得標明出處與前提（同一模型、同一預算）。本站翻譯自 <code>BENCHMARKS.md</code>。</div>
 </div>
 
+
+<!-- Tutorial Sections (教學補強) -->
+
+<style>
+.tutorial-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid var(--accent, #4a9eff); }
+.tutorial-section h2 { margin-top: 0; color: var(--accent, #4a9eff); font-size: 1.3rem; }
+.tutorial-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.tutorial-section th, .tutorial-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.tutorial-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.tutorial-section ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+.tutorial-section li { margin: 0.25rem 0; }
+.tutorial-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.tutorial-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="tutorial-section">
+
+<h2>教學解說</h2>
+<p>這份基準測試的核心價值在於「<strong>公平比較</strong>」：所有系統用同一個模型（Kimi K2.6）、同一 token 預算、同一個裁判。這在記憶系統基準中很少見——多數發表的基準不公開裁判驗證。</p>
+<p>關鍵數字：Graphify 在 LOCOMO 上的 recall@10 = 0.497，是 mem0 的約 10 倍。QA accuracy 45.3% 比 supermemory 低 4.4 分，但 ingest 成本只要它的約 1/11。這反映了「圖檢索 vs 向量檢索」的權衡：圖結構提供了更好的關係理解，但需要更多的預處理。</p>
+<p>程式碼智慧方面，Graphify 在 ERPNext（約 1M 行）上把關鍵事實覆蓋率從 70.8% 拉到 82.0%，證明了「用圖取代 grep」的實際價值。</p>
+
+
+<h2>Worked Example：重現 LOCOMO 基準</h2>
+<ol>
+<li><strong>設定環境</strong>：設定 <code>MOONSHOT_API_KEY</code> 環境變數。</li>
+<li><strong>抓取資料集</strong>：按照 BENCHMARKS.md 說明的佈局，下載 LOCOMO 資料集到本機。</li>
+<li><strong>執行基準</strong>：執行 <code>python memory/runner.py --phase 3 --split locomo --n 300 --adapters graphify_v1_surreal --cn natural --workers 6 --max-spend 15</code>。</li>
+<li><strong>檢查 spend ledger</strong>：查看每次跑的 token 消耗與成本記錄。</li>
+<li><strong>比較結果</strong>：對照文中表格的 recall@10 與 QA accuracy 數字。</li>
+</ol>
+<div class="callout info"><strong>提醒</strong>：這是上游自測的數字（self-reported benchmark）。引用時記得標明出處與前提（同一模型、同一預算）。</div>
+
+
+<h2>常見錯誤與診斷</h2>
+<table>
+<tr><th>錯誤訊息</th><th>原因</th><th>解決方式</th></tr>
+<tr><td><code>MOONSHOT_API_KEY not set</code></td><td>未設定 API key</td><td>執行 <code>export MOONSHOT_API_KEY=your_key</code></td></tr>
+<tr><td><code>max-spend exceeded</code></td><td>超過預算上限</td><td>提高 <code>--max-spend</code> 參數或減少測試數量 <code>--n</code></td></tr>
+<tr><td><code>adapter not found: graphify_v1_surreal</code></td><td>SurrealDB 未安裝或未啟動</td><td>安裝 SurrealDB 並啟動，或改用其他 adapter</td></tr>
+<tr><td><code>裁判一致性低於 90%</code></td><td>裁判模型或 prompt 有問題</td><td>檢查 Kimi K2.6 連線，確認裁判 prompt 未被修改</td></tr>
+</table>
+
+
+<h2>練習與驗收清單</h2>
+<ul>
+<li>[ ] 能解釋「公平規則」的四個條件（同一模型、同一 embedder、同一預算、零 LLM 建圖）</li>
+<li>[ ] 能說出 LOCOMO 與 LongMemEval-S 兩個基準的差異</li>
+<li>[ ] 能計算 coverage 公式的值（covered + 0.5 * partial）/ total</li>
+<li>[ ] 能解釋為什麼 supermemory 的 recall 被 embedder 綁住</li>
+<li>[ ] 能說明「建圖零 LLM 成本」的技術原理</li>
+<li>[ ] 能比較 graphify 與 mem0 在 LOCOMO 上的 recall@10 差異</li>
+</ul>
+
+</div>
+<!-- End Tutorial Sections -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

@@ -130,6 +130,62 @@ communities = cluster(G)      # unchanged</code></pre>
 <div class="callout"><strong>教學價值</strong>：這份設計是「大型開源專案怎麼把工程計劃寫成可稽核文件」的範例——問題 → pipeline → 每步參數與理由 → 整合點 → 測試 → non-goals。而且它已經落地：<code>cache.py</code>（semantic cache）、<code>dedup.py</code>（七步去重）、<code>build_merge</code> 都在 <a href="code/ops.html">程式碼對照 · ops</a> 裡能對到實作。</div>
 </div>
 
+
+<!-- Tutorial Sections (教學補強) -->
+
+<style>
+.tutorial-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid var(--accent, #4a9eff); }
+.tutorial-section h2 { margin-top: 0; color: var(--accent, #4a9eff); font-size: 1.3rem; }
+.tutorial-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.tutorial-section th, .tutorial-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.tutorial-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.tutorial-section ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+.tutorial-section li { margin: 0.25rem 0; }
+.tutorial-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.tutorial-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="tutorial-section">
+
+<h2>教學解說</h2>
+<p>增量更新解決「<strong>每次重跑都全部重做</strong>」的問題。核心機制是 manifest.json：記錄上次的檔案狀態，下次跑時只處理新增或修改的檔案。自動偵測，不需要 flag。</p>
+<p>實體去重解決「<strong>同實體不同名字</strong>」的問題。七個步驟從精確正規化到可選 LLM 仲裁，形成一個完整的去重管線。關鍵設計：用 MinHash/LSH 產生候選對（O(n) 而非 O(n²)），再用 Jaro-Winkler 驗證。</p>
+<p>整合點很重要：去重在 build_merge 之後、cluster 之前執行。圖越乾淨，社群偵測越好。</p>
+
+
+<h2>Worked Example：觀察增量更新的行為</h2>
+<ol>
+<li><strong>首次全量</strong>：在一個有 10 個檔案的目錄執行 <code>graphify extract .</code>，觀察輸出：所有檔案都被處理。</li>
+<li><strong>修改一個檔案</strong>：修改其中一個 Python 檔案，再次執行 <code>graphify extract .</code>。觀察輸出：只有 1 個檔案被重新處理，其他 9 個從快取讀取。</li>
+<li><strong>新增一個檔案</strong：新增一個 Python 檔案，再次執行。觀察輸出：只有新檔案被處理。</li>
+<li><strong>刪除一個檔案</strong>：刪除一個 Python 檔案，再次執行。觀察輸出：被刪除檔案的節點從圖中移除。</li>
+</ol>
+<div class="callout info"><strong>關鍵觀察</strong>：manifest.json 只在成功完成後寫入。中途當機不會弄壞下次的 diff。</div>
+
+
+<h2>常見錯誤與診斷</h2>
+<table>
+<tr><th>錯誤訊息</th><th>原因</th><th>解決方式</th></tr>
+<tr><td><code>manifest.json: file not found</code></td><td>首次執行或 manifest 被刪除</td><td>這是正常的，首次執行永遠是全量</td></tr>
+<tr><td><code>dedup: entropy too low</code></td><td>label 熵值 < 2.5 bits/char</td><td>短歧義名（如 AI、DB）不自動合併，這是設計如此</td></tr>
+<tr><td><code>build_merge: graph conflict</code></td><td>merge 時遇到衝突</td><td>檢查是否有重複的節點 ID</td></tr>
+<tr><td><code>semantic cache: stale entry</code></td><td>快取的 source_file 路徑已改變</td><td>快取會自動更新 source_file 到新路徑</td></tr>
+</table>
+
+
+<h2>練習與驗收清單</h2>
+<ul>
+<li>[ ] 能解釋增量更新的自動偵測機制</li>
+<li>[ ] 能說明 manifest.json 的作用與寫入時機</li>
+<li>[ ] 能說出七步去重的名稱與順序</li>
+<li>[ ] 能解釋 MinHash/LSH 為什麼比 O(n²) 更快</li>
+<li>[ ] 能說明同社群加分（+0.05）的設計理由</li>
+<li>[ ] 能測試增量更新：修改檔案後只重新處理變更部分</li>
+</ul>
+
+</div>
+<!-- End Tutorial Sections -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

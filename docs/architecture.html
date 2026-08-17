@@ -109,6 +109,63 @@ Rules:
 <p>也就是「先讀圖、再回答」——Dogfooding 的最好示範。本站做這個教學網站時，也是用同樣的邏輯在組織內容。</p>
 </div>
 
+
+<!-- Tutorial Sections (教學補強) -->
+
+<style>
+.tutorial-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid var(--accent, #4a9eff); }
+.tutorial-section h2 { margin-top: 0; color: var(--accent, #4a9eff); font-size: 1.3rem; }
+.tutorial-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.tutorial-section th, .tutorial-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.tutorial-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.tutorial-section ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+.tutorial-section li { margin: 0.25rem 0; }
+.tutorial-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.tutorial-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="tutorial-section">
+
+<h2>教學解說</h2>
+<p>Graphify 的架構核心是「<strong>一個 pipeline、七個階段、每個階段一個純函數</strong>」。理解這個架構的關鍵在於：所有模組之間只透過 Python dict 和 NetworkX 圖物件溝通，沒有共享狀態。這代表你可以獨立測試每個模組，也可以替換任何階段的實作。</p>
+<p>14 個模組分兩組：前七個（detect→export）是主線 pipeline，後八個是圍繞它的服務。服務層的作用是「進料（ingest）、加速（cache）、把關（security/validate）、對外（serve/watch）」。</p>
+<p>新增語言抽取器的 5 步驟是 contributor 入門路線圖：先寫 extractor 函數、再註冊副檔名、加 tree-sitter 依賴、最後寫測試。這是開源專案「可擴充性」的具體體現。</p>
+
+
+<h2>Worked Example：從零跑完架構 pipeline</h2>
+<ol>
+<li><strong>準備語料</strong>：建立一個包含 3 個 Python 檔案的目錄 <code>my-project/</code>，每個檔案有一個類別和幾個函數。</li>
+<li><strong>執行 detect</strong>：<code>graphify detect my-project/</code> — 檢查輸出的 <code>.graphify_detect.json</code>，確認偵測到的檔案數量與類型。</li>
+<li><strong>執行 extract</strong>：<code>graphify extract my-project/</code> — 觀察 AST 抽取階段（Pass 1）的輸出，注意 nodes/edges 的數量。</li>
+<li><strong>檢查產出</strong>：查看 <code>graphify-out/graph.json</code>，確認每個節點有 <code>id</code>、<code>label</code>、<code>source_file</code> 屬性。</li>
+<li><strong>驗證社群</strong>：查看 <code>GRAPH_REPORT.md</code> 中的社群數量，確認 Leiden 演算法正確分群。</li>
+</ol>
+<div class="callout info"><strong>預期產出</strong>：<code>graph.json</code>（知識圖譜資料）、<code>graph.html</code>（互動視覺化）、<code>GRAPH_REPORT.md</code>（摘要報告）。純程式碼語料零 LLM 成本。</div>
+
+
+<h2>常見錯誤與診斷</h2>
+<table>
+<tr><th>錯誤訊息</th><th>原因</th><th>解決方式</th></tr>
+<tr><td><code>ModuleNotFoundError: tree_sitter</code></td><td>未安裝 tree-sitter 依賴</td><td>執行 <code>pip install graphify[code]</code> 或 <code>pip install tree-sitter</code></td></tr>
+<tr><td><code>extract.py: no nodes extracted</code></td><td>語料中沒有支援的語言檔案</td><td>檢查 <code>CODE_EXTENSIONS</code> 列表，確認副檔名被支援</td></tr>
+<tr><td><code>build_graph: empty graph</code></td><td>所有檔案的抽取結果為空</td><td>用 <code>--verbose</code> 重新跑 extract，查看每個檔案的抽取狀態</td></tr>
+<tr><td><code>validate: schema error</code></td><td>extractor 回傳的 dict 格式不符</td><td>檢查 <code>nodes</code> 是否有 <code>id</code> 和 <code>label</code>，<code>edges</code> 是否有 <code>source</code>、<code>target</code>、<code>relation</code></td></tr>
+</table>
+
+
+<h2>練習與驗收清單</h2>
+<ul>
+<li>[ ] 能說出七階段 pipeline 的名稱與順序</li>
+<li>[ ] 能畫出「模組職責表」中至少 5 個模組的輸入/輸出</li>
+<li>[ ] 能解釋 <code>validate.py</code> 在 pipeline 的哪個階段被呼叫</li>
+<li>[ ] 能說明 EXTRACTED vs INFERRED vs AMBIGUOUS 標籤的差異</li>
+<li>[ ] 能新增一個簡單的語言抽取器（至少包含 nodes 和 edges 的回傳）</li>
+<li>[ ] 能用 <code>pytest tests/ -q</code> 跑通所有測試</li>
+</ul>
+
+</div>
+<!-- End Tutorial Sections -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

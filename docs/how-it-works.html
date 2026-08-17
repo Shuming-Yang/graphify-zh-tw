@@ -161,6 +161,65 @@ Hyperedges (group relationships connecting 3+ nodes) live in G.graph["hyperedges
 <p class="hint">延伸：<a href="architecture.html">架構總覽</a> · <a href="benchmarks.html">效能基準</a> · <a href="../map.html">概念地圖</a></p>
 </div>
 
+
+<!-- Tutorial Sections (教學補強) -->
+
+<style>
+.tutorial-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid var(--accent, #4a9eff); }
+.tutorial-section h2 { margin-top: 0; color: var(--accent, #4a9eff); font-size: 1.3rem; }
+.tutorial-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.tutorial-section th, .tutorial-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.tutorial-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.tutorial-section ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+.tutorial-section li { margin: 0.25rem 0; }
+.tutorial-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.tutorial-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="tutorial-section">
+
+<h2>教學解說</h2>
+<p>Graphify 的核心理念是「<strong>建一次圖，之後都讀圖</strong>」。三遍處理是理解整個系統的鑰匙：</p>
+<ul>
+<li><strong>Pass 1（AST）</strong>：tree-sitter 在本機解析，不需要 API key。這是「免費」的部分，處理所有程式碼檔案。</li>
+<li><strong>Pass 2（影音）</strong>：faster-whisper 本機轉錄，也不需要 API key。轉錄 prompt 會用目前圖的 top god nodes 當種子。</li>
+<li><strong>Pass 3（語意）</strong>：Claude 子代理處理文件/論文/圖片。這是唯一花 token 的部分。</li>
+</ul>
+<p>社群偵測用 Leiden 演算法，不需要 embedding。信任標籤（EXTRACTED/INFERRED/AMBIGUOUS）讓你知道每一條關係的可信度。</p>
+
+
+<h2>Worked Example：觀察三遍處理的差異</h2>
+<ol>
+<li><strong>純程式碼語料</strong>：用 httpx 案例（6 個 Python 檔），執行 <code>graphify extract worked/httpx/raw</code>。觀察輸出：Pass 1 處理所有檔案，Pass 3 被跳過，token cost = 0。</li>
+<li><strong>混合語料</strong>：用 mixed-corpus 案例（3 Python + 1 markdown + 1 圖片），執行 <code>graphify extract worked/mixed-corpus/raw</code>。觀察 Pass 3 被觸發，token cost > 0。</li>
+<li><strong>比較結果</strong>：查看兩份 <code>GRAPH_REPORT.md</code>，比較 nodes/edges 數量與社群分佈。</li>
+</ol>
+<div class="callout info"><strong>關鍵觀察</strong>：純程式碼語料的邊主要是 EXTRACTED（確定性），混合語料的邊有更多 INFERRED（語意推論）。信任標籤比例反映了語料類型。</div>
+
+
+<h2>常見錯誤與診斷</h2>
+<table>
+<tr><th>錯誤訊息</th><th>原因</th><th>解決方式</th></tr>
+<tr><td><code>faster-whisper not found</code></td><td>未安裝影音轉錄依賴</td><td>執行 <code>pip install graphify[audio]</code></td></tr>
+<tr><td><code>Pass 3: no LLM provider configured</code></td><td>語料有文件但未設定 API key</td><td>設定 <code>ANTHROPIC_API_KEY</code> 或 <code>OPENAI_API_KEY</code> 環境變數</td></tr>
+<tr><td><code>Leiden: empty communities</code></td><td>圖中沒有邊或節點太少</td><td>檢查 extract 階段是否正確產生 edges</td></tr>
+<tr><td><code>SHA256 cache: stale entries</code></td><td>快取與實際檔案不同步</td><td>執行 <code>graphify extract --no-cache</code> 清除快取重跑</td></tr>
+</table>
+
+
+<h2>練習與驗收清單</h2>
+<ul>
+<li>[ ] 能解釋三遍處理（Pass 1/2/3）各自的職責與差異</li>
+<li>[ ] 能說出哪些處理階段是「免費的」（不需要 API key）</li>
+<li>[ ] 能解釋 Leiden 社群偵測如何運作，以及為什麼不需要 embedding</li>
+<li>[ ] 能說明三種信任標籤的意義與 confidence score 的離散級距</li>
+<li>[ ] 能比較不同大小語料的 token 節省倍數</li>
+<li>[ ] 能解釋 SHA256 快取的運作原理與快取失效時機</li>
+</ul>
+
+</div>
+<!-- End Tutorial Sections -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

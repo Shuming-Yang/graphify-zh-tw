@@ -71,6 +71,61 @@
 <div class="callout info"><strong>本站觀點</strong>：這份威脅面模型是「本機工具的務實安全」——重點不在防禦無敵，而在「預設不碰網路、不執行、不 shell、輸入一律消毒、LLM 資料包成不可信區塊」。想讀實作，<a href="code/ops.html">程式碼對照 · ops</a> 裡有 <code>security.py</code> 的逐函數講解。</div>
 </div>
 
+
+<!-- Tutorial Sections (教學補強) -->
+
+<style>
+.tutorial-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid var(--accent, #4a9eff); }
+.tutorial-section h2 { margin-top: 0; color: var(--accent, #4a9eff); font-size: 1.3rem; }
+.tutorial-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.tutorial-section th, .tutorial-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.tutorial-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.tutorial-section ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+.tutorial-section li { margin: 0.25rem 0; }
+.tutorial-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.tutorial-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="tutorial-section">
+
+<h2>教學解說</h2>
+<p>Graphify 的安全模型是「<strong>本機工具的務實安全</strong>」：預設不碰網路、不執行來源碼、不 shell、輸入一律消毒、LLM 資料包成不可信區塊。這不是「防禦無敵」，而是「讓攻擊從第一次就成功變成需要繞過」。</p>
+<p>威脅面解析涵蓋 SSRF、路徑穿越、XSS、prompt injection 等。每個威脅都有對應的緩解方式，這些實作都在 <code>security.py</code> 裡。特別值得注意的是原始檔內容的 prompt injection 防禦：用 <code>&lt;untrusted_source&gt;</code> 雜湊戳記包住每個檔案，並在插入前解除已知的 jailbreak 記號。</p>
+
+
+<h2>Worked Example：測試安全驗證</h2>
+<ol>
+<li><strong>測試 URL 驗證</strong>：在 Python 中呼叫 <code>from graphify.security import validate_url</code>，嘗試驗證 <code>http://localhost:8080</code>（應被擋掉，因為是私有 IP）。</li>
+<li><strong>測試路徑穿越</strong>：嘗試用 <code>../../etc/passwd</code> 作為圖檔路徑，觀察 <code>validate_graph_path()</code> 如何拒絕。</li>
+<li><strong>測試 label 消毒</strong>：用包含控制字元的 label 呼叫 <code>sanitize_label()</code>，確認輸出被正確清理。</li>
+<li><strong>測試安全 fetch</strong>：用 <code>safe_fetch()</code> 嘗試下載一個超過 50 MB 的檔案，確認在 50 MB 處中止。</li>
+</ol>
+<div class="callout info"><strong>關鍵觀察</strong>：每個驗證函數都有明確的錯誤訊息，不會默默失敗。這是「fail loud」的安全設計原則。</div>
+
+
+<h2>常見錯誤與診斷</h2>
+<table>
+<tr><th>錯誤訊息</th><th>原因</th><th>解決方式</th></tr>
+<tr><td><code>validate_url: only http/https allowed</code></td><td>嘗試用 file:// 或 ftp:// 協議</td><td>改用 http:// 或 https://</td></tr>
+<tr><td><code>validate_graph_path: must be inside graphify-out/</code></td><td>嘗試存取 graphify-out/ 以外的路徑</td><td>確保路徑在 graphify-out/ 目錄內</td></tr>
+<tr><td><code>safe_fetch: response too large</code></td><td>下載內容超過 50 MB</td><td>減少下載範圍或用 streaming 處理</td></tr>
+<tr><td><code>sanitize_label: control characters removed</code></td><td>label 包含不可見字元</td><td>清理 label 中的控制字元</td></tr>
+</table>
+
+
+<h2>練習與驗收清單</h2>
+<ul>
+<li>[ ] 能說出 Graphify 不做的四件事（不跑網路監聽、不執行來源碼、不用 shell=True、不儲存憑證）</li>
+<li>[ ] 能解釋 SSRF 防禦的運作方式</li>
+<li>[ ] 能說明 <code>&lt;untrusted_source&gt;</code> 雜湊戳記的作用</li>
+<li>[ ] 能測試至少三種安全驗證函數</li>
+<li>[ ] 能解釋為什麼 MCP server 預設用 stdio transport</li>
+<li>[ ] 能說明如何回報安全漏洞（不開公開 issue）</li>
+</ul>
+
+</div>
+<!-- End Tutorial Sections -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

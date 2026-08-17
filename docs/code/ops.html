@@ -213,6 +213,63 @@
 <div class="callout"><strong>看完這頁你應該能說出</strong>：快取的 key 是什麼、dedup 為什麼拒絕跨專案、validate_url 的三道檢查、DNS-rebind 是怎麼被擋的。這裡幾乎每一支模組都是「設計文件（<a href="../incremental.html">incremental</a>、<a href="../security.html">security</a>）→ 實作」的對照。</div>
 </div>
 
+
+<!-- Tutorial Sections (教學補強) -->
+
+<style>
+.tutorial-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid var(--accent, #4a9eff); }
+.tutorial-section h2 { margin-top: 0; color: var(--accent, #4a9eff); font-size: 1.3rem; }
+.tutorial-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.tutorial-section th, .tutorial-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.tutorial-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.tutorial-section ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+.tutorial-section li { margin: 0.25rem 0; }
+.tutorial-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.tutorial-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="tutorial-section">
+
+<h2>教學解說</h2>
+<p>ops 層是圍繞主線 pipeline 的服務：<strong>cache（快取）/ dedup（去重）/ ingest（進料）/ watch（監控）/ serve（服務）/ security（安全）/ validate（驗證）</strong>。這些模組讓 Graphify 從「能跑」變成「好用」。</p>
+<p>cache.py 實作 semantic cache，用內容雜湊為 key，避免重複呼叫 LLM。dedup.py 實作七步去重管線。ingest.py 負責從 URL 下載內容。watch.py 監控目錄變更。serve.py 提供 MCP stdio server。security.py 與 validate.py 負責所有驗證。</p>
+<p>安全相關的函數值得特別關注：<code>validate_url()</code> 擋 SSRF、<code>validate_graph_path()</code> 擋路徑穿越、<code>sanitize_label()</code> 擋 XSS 與 prompt injection。</p>
+
+
+<h2>Worked Example：測試 cache 與 dedup</h2>
+<ol>
+<li><strong>首次執行</strong>：<code>graphify extract my-project/</code>，觀察 token 消耗。</li>
+<li><strong>再次執行</strong>：不修改任何檔案，再次執行 <code>graphify extract my-project/</code>。觀察 token 消耗應該為 0（全部從快取讀取）。</li>
+<li><strong>修改檔案</strong>：修改一個檔案，再次執行。觀察只有修改的檔案被重新處理。</li>
+<li><strong>檢查 dedup</strong>：如果有重複的 label（例如同名類別在不同檔案），觀察 dedup 如何合併。</li>
+</ol>
+<div class="callout info"><strong>關鍵觀察</strong>：cache 用 SHA256 內容雜湊，改名檔案仍會命中快取（因為內容沒變）。</div>
+
+
+<h2>常見錯誤與診斷</h2>
+<table>
+<tr><th>錯誤訊息</th><th>原因</th><th>解決方式</th></tr>
+<tr><td><code>cache: corruption detected</code></td><td>快取檔案損壞</td><td>刪除 <code>graphify-out/cache/</code> 重新執行</td></tr>
+<tr><td><code>dedup: MinHash error</code></td><td>datasketch 套件問題</td><td>執行 <code>pip install datasketch</code></td></tr>
+<tr><td><code>ingest: fetch failed</code></td><td>URL 無法存取</td><td>檢查 URL 是否正確，或是否有網路問題</td></tr>
+<tr><td><code>serve: JSON decode error</code></td><td>graph.json 損壞</td><td>重新執行 <code>graphify extract</code> 產生新的 graph.json</td></tr>
+<tr><td><code>security: SSRF blocked</code></td><td>嘗試存取私有 IP</td><td>這是正常的，安全驗證在運作</td></tr>
+</table>
+
+
+<h2>練習與驗收清單</h2>
+<ul>
+<li>[ ] 能解釋 semantic cache 的運作原理</li>
+<li>[ ] 能說明 dedup 的七個步驟</li>
+<li>[ ] 能測試 cache 的命中與失效</li>
+<li>[ ] 能解釋 security.py 中至少 3 個驗證函數</li>
+<li>[ ] 能說明 serve.py 的 MCP stdio transport</li>
+<li>[ ] 能診斷至少 2 種常見錯誤</li>
+</ul>
+
+</div>
+<!-- End Tutorial Sections -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

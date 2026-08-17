@@ -84,6 +84,61 @@
 <p class="hint">對照指南：每頁頂部標示對應的原始檔與行數。程式碼引用自 Apache-2.0 上游，僅用於教學。</p>
 </div>
 
+
+<!-- Tutorial Sections (教學補強) -->
+
+<style>
+.tutorial-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid var(--accent, #4a9eff); }
+.tutorial-section h2 { margin-top: 0; color: var(--accent, #4a9eff); font-size: 1.3rem; }
+.tutorial-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.tutorial-section th, .tutorial-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.tutorial-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.tutorial-section ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+.tutorial-section li { margin: 0.25rem 0; }
+.tutorial-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.tutorial-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="tutorial-section">
+
+<h2>教學解說</h2>
+<p>程式碼對照區是本站最深的章節。每個函數一個預設收縮的 <code>&lt;details&gt;</code> 塊：點開看 signature + 中文講解，核心函數附逐行註解。這反映了「<strong>從文檔到原始碼</strong>」的學習路徑。</p>
+<p>建議的學習順序：先從主線 pipeline（detect→extract→build→cluster）開始，那是資料流主幹。看懂後再往分析與報告、輸出、維運與安全延伸。</p>
+<p>程式碼引用自 Apache-2.0 上游，僅用於教學。這是開源專案「合理使用」的範例。</p>
+
+
+<h2>Worked Example：追蹤一個函數的完整流程</h2>
+<ol>
+<li><strong>選擇函數</strong>：選擇 <code>detect.py</code> 中的 <code>collect_files()</code> 函數。</li>
+<li><strong>查看實作</strong>：在 code/pipeline.html 中找到 collect_files 的講解，展開 details 塊。</li>
+<li><strong>追蹤呼叫者</strong>：找出誰呼叫 collect_files（在 extract.py 中）。</li>
+<li><strong>追蹤被呼叫者</strong>：找出 collect_files 呼叫了什麼（例如 os.walk、CODE_EXTENSIONS）。</li>
+<li><strong>畫出流程</strong>：畫出 collect_files 的呼叫流程圖。</li>
+</ol>
+<div class="callout info"><strong>關鍵觀察</strong>：每個函數都有明確的輸入/輸出，這是「純函數」設計的體現。</div>
+
+
+<h2>常見錯誤與診斷</h2>
+<table>
+<tr><th>錯誤訊息</th><th>原因</th><th>解決方式</th></tr>
+<tr><td><code>code: file not found</code></td><td>程式碼對照頁面找不到對應的原始檔</td><td>檢查 repo 版本是否與教學站對齊</td></tr>
+<tr><td><code>line number mismatch</code></td><td>行數與實際檔案不符</td><td>這是正常的，原始檔會持續演進</td></tr>
+</table>
+
+
+<h2>練習與驗收清單</h2>
+<ul>
+<li>[ ] 能找到至少 3 個核心函數的實作位置</li>
+<li>[ ] 能追蹤一個函數的呼叫者與被呼叫者</li>
+<li>[ ] 能解釋 detect→extract→build→cluster 的資料流</li>
+<li>[ ] 能說明「純函數」設計的優點</li>
+<li>[ ] 能找到 security.py 中至少 2 個安全驗證函數</li>
+<li>[ ] 能解釋為什麼 extract.py 從 2527 行瘦身到 1588 行</li>
+</ul>
+
+</div>
+<!-- End Tutorial Sections -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

@@ -114,6 +114,61 @@ Non-goals:
 <p class="hint">教學延伸：這份 RFC 展示了 Graphify 團隊怎麼為「AI 代理導覽」設計介面——而實際的檔案摘要概念已部分體現在「本站怎麼挑要教哪個檔案」的策展邏輯上。想讀 graph.json 的實際 schema，看 <a href="../map.html">概念地圖</a> 或 <a href="worked.html">實作案例</a>。</p>
 </div>
 
+
+<!-- Tutorial Sections (教學補強) -->
+
+<style>
+.tutorial-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid var(--accent, #4a9eff); }
+.tutorial-section h2 { margin-top: 0; color: var(--accent, #4a9eff); font-size: 1.3rem; }
+.tutorial-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.tutorial-section th, .tutorial-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.tutorial-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.tutorial-section ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+.tutorial-section li { margin: 0.25rem 0; }
+.tutorial-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.tutorial-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="tutorial-section">
+
+<h2>教學解說</h2>
+<p>這份 RFC 解決一個實際問題：<strong>代理常常得打開原始檔，只為了回答「這個檔案是負責做什麼的？」</strong>一個放在圖節點附近的短摘要，可以減少重複讀檔。</p>
+<p>兩種方案的張力是「<strong>單一 artifact 的簡潔 vs 核心圖的精簡</strong>」。Option A 把摘要放進 graph.json（簡單但圖變大），Option B 放 sidecar（圖保持精簡但多一個 artifact 要同步）。這是典型的架構取捨。</p>
+<p>摘要的內容設計很精確：只放模組 docstring、匯出符號、重要 import、主導圖關係等「本機訊號」，不放長呼叫鏈或完整相依清單。</p>
+
+
+<h2>Worked Example：設計你自己的摘要方案</h2>
+<ol>
+<li><strong>分析需求</strong>：列出你的代理最常問的導覽問題（例如「這個檔案做什麼？」、「哪些檔案與 auth 相關？」）。</li>
+<li><strong>評估 Option A</strong>：計算如果把摘要放進 graph.json，圖大小會增加多少（每個摘要約 200-300 字元 × 節點數）。</li>
+<li><strong>評估 Option B</strong>：設計 sidecar 的 schema，考慮如何處理新鮮度與同步問題。</li>
+<li><strong>選擇方案</strong>：根據你的使用場景（圖大小限制、同步需求、消費者數量）做出選擇。</li>
+</ol>
+<div class="callout info"><strong>設計原則</strong>：摘要應該是「可選的」——有摘要時更好用，沒有摘要時系統照常運作。</div>
+
+
+<h2>常見錯誤與診斷</h2>
+<table>
+<tr><th>錯誤訊息</th><th>原因</th><th>解決方式</th></tr>
+<tr><td><code>summary: token budget exceeded</code></td><td>摘要總長度超過預算</td><td>減少摘要數量或縮短每條摘要長度</td></tr>
+<tr><td><code>node ID mismatch in sidecar</code></td><td>sidecar 中的節點 ID 與 graph.json 不符</td><td>重新產生 sidecar 或修復 ID 映射</td></tr>
+<tr><td><code>summary: no source signal</code></td><td>檔案沒有 docstring 或匯出符號</td><td>這是正常的，這類檔案的摘要可能為空</td></tr>
+</table>
+
+
+<h2>練習與驗收清單</h2>
+<ul>
+<li>[ ] 能解釋 Option A 與 Option B 的優缺點</li>
+<li>[ ] 能說明摘要應該包含哪些訊息</li>
+<li>[ ] 能解釋為什麼 v1 不摘要每個函數/方法</li>
+<li>[ ] 能設計一個符合 200-300 字元限制的摘要</li>
+<li>[ ] 能說明摘要如何與 graphify explain 整合</li>
+<li>[ ] 能解釋「預設不輸出摘要」的設計理由</li>
+</ul>
+
+</div>
+<!-- End Tutorial Sections -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
