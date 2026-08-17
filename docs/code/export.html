@@ -153,6 +153,64 @@
 <div class="callout"><strong>看完這頁你應該能說出</strong>：graph.json 為什麼拒絕「更小的覆寫」、graph.html 是怎麼做到單檔自含的、Obsidian vault 的 wikilink 從哪來。接著讀 <a href="ops.html">ops 維運與安全</a> 看 cache/dedup/serve 等服務模組。</div>
 </div>
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：把一張圖輸出成四種格式、餵給四種消費者</h2>
+<p>前面是「看 shrink guard 的原理」；這次是<strong>跨工具的分發場景</strong>：同一份知識圖譜，要同時給「網頁瀏覽者、Obsidian 使用者、Neo4j 分析師、CI 報告」四種角色。</p>
+<ol>
+<li><strong>網頁瀏覽者 → graph.html</strong>：<code>graphify export</code>（或預設產出）給互動圖；確認節點數低於 <code>_viz_node_limit</code>，太大就分流。</li>
+<li><strong>Obsidian 使用者 → vault</strong>：<code>graphify export --obsidian</code>——每社群一篇 <code>_COMMUNITY_&lt;name&gt;.md</code>，節點間用 <code>[[wikilink]]</code> 互連；檔名安全化（<code>_obsidian_safe_stem</code>）避免跳字與同名衝突，frontmatter 走 <code>_yaml_str</code> 防注入。</li>
+<li><strong>Neo4j/FalkorDB 分析師 → cypher.txt</strong>：<code>graphify export --neo4j</code> 給 <code>to_cypher</code> 的產物，讓圖論分析直接在資料庫跑（Cypher 字串與 label 都有 <code>_cypher_escape</code> 保護）。</li>
+<li><strong>CI/文件 → SVG + GraphML</strong>：<code>--svg</code> 給 Notion/GitHub 內嵌，<code>--graphml</code> 給 Gephi/yEd 做深度視覺化。</li>
+<li><strong>對齊與版本化</strong>：所有輸出都來自同一張圖；<code>built_at_commit</code> 記在 graph.json，確保四份輸出都標明「由哪個 commit 產生」，不會有人拿過期圖做決策。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：export 的存在價值就是「一次建圖、多格式分發」——四種消費者共用同一份資料，卻各自用最順手的工具。路徑的關鍵是「<strong>單一來源 + 標註新鮮度</strong>」，否則四份輸出各自演進就會開始打架。</div>
+
+<h2>② 深入原理擴充：shrink guard、原子寫、與「圖的資料安全」</h2>
+<p>export 頁最被低估的是一堆「寫檔防護」——它們是「圖被自己搞壞」的最後防線：</p>
+<ul>
+<li><strong>Shrink guard（issue #479）</strong>：既有 graph.json 存在且新圖節點數更少 → 拒絕覆寫。因為「新圖比較小」通常代表前一輪 chunk 檔遺失或 fuzzy dedup 誤併，而不是真的刪了程式碼。讀不到既有檔（corrupt）時也 fail-safe——寧可不寫，也不讓局部重建覆蓋掉好的圖。</li>
+<li><strong>Atomic write</strong>：<code>write_json_atomic()</code> 先寫暫存再 rename——中途當機不會截斷好的 graph.json。這跟 serve 的 <code>_load_graph</code> 復原訊息搭配：壞檔不會默默產生。</li>
+<li><strong>方向還原（issue #563）</strong>：NetworkX 無向儲存可能把 <code>calls</code> 這類有向邊的端點順序搞反，build 時在 <code>_src</code>/<code>_tgt</code> 藏了真實端點，export 時還原——否則「誰呼叫誰」會倒反。</li>
+<li><strong>HTML-escape</strong>：graph.html 的節點 label 都經 <code>esc()</code> 才進 innerHTML（XSS 緩解），與 security 的 <code>sanitize_label</code> 對應。</li>
+</ul>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：以為「export 只是把圖序列化，不會改資料」。其實 export 階段<strong>會變造資料</strong>：節點補上 <code>community</code>、<code>community_name</code>、<code>norm_label</code>（小寫去重音，供檢索）；邊補 <code>_src</code>/<code>_tgt</code> 還原方向；還會因 shrink guard 拒絕寫入。若你拿「export 後的 graph.json」直接當建圖輸入重跑，會看到多餘屬性、甚至格式不相容——export 的產物是「給消費者讀的」，不是「給 pipeline 吃的」。想重跑要用原始 extraction/chunk 檔。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td><code>to_json</code> 回傳 False、檔案沒更新</td><td>shrink guard 擋下（新圖更小）或既有檔損壞讀不到</td><td>檢查上一輪 chunk 檔是否遺失；確認後再 <code>--force</code>；不要盲推 <code>--force</code></td></tr>
+<tr><td>graph.json 半截/格式壞掉</td><td>舊版沒走原子寫，或外部工具覆寫</td><td>重新 export；確認 <code>write_json_atomic</code> 生效；serve 會印復原訊息</td></tr>
+<tr><td>Obsidian vault 出現斷鏈 wikilink</td><td>節點 label 含不安全的檔名字元（/、空格、跳字）</td><td>確認 <code>_obsidian_safe_stem</code> 與 <code>_dedup_node_filenames</code> 有走；重跑 export</td></tr>
+<tr><td>互動圖無法生成</td><td>節點數超過 <code>_viz_node_limit</code>（瀏覽器開不動）</td><td>縮小語料、用社群篩選、或改用 SVG/GraphML</td></tr>
+<tr><td>Neo4j 匯入報語法錯誤</td><td>label 含特殊字元、Cypher 字串沒 escape</td><td>確認 <code>_cypher_escape</code>/<code>_cypher_label</code> 有走；檢查產物 cypher.txt 內容</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>shrink guard 用「節點數」當判據。請設計一個反例：新圖節點數一樣甚至更多、但內容其實變差（例如語意邊大量遺失）——guard 會漏接。要怎麼改判據才能抓到這種「等量退化」？</li>
+<li>「export 產物不適合當 pipeline 輸入」。如果要設計一個 round-trip（export → 重import → 原圖），你需要在 export 時保留哪些額外資訊，才能讓 round-trip 得到 identical graph？</li>
+<li>graph.html 是單一自含檔（1.8MB）。請評估「多檔 split（js/css 分開）」與「單檔 self-contained」在部署、快取、離線使用的取捨，並說明 graphify 為何選後者。</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

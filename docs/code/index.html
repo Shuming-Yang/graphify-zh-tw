@@ -139,6 +139,62 @@
 </div>
 <!-- End Tutorial Sections -->
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：用 graphify 產生「graphify 自己的開發地圖」</h2>
+<p>前面是「追蹤單一函數」；這次是<strong>自舉（dogfooding）</strong>：graphify 官方就用自己管理自己——AGENTS.md 規定「先讀 graph.json、改完程式碼跑 <code>graphify update .</code>」。你要親手複製這個閉環。</p>
+<ol>
+<li><strong>在 repo 根建圖</strong>：<code>graphify extract .</code> 掃自己整個 repo——detect 會過濾 <code>graphify-out/</code>、node_modules 等 noise；確認程式碼走 AST、文件走 Pass 3。</li>
+<li><strong>讀 GRAPH_REPORT 驗證理解</strong>：對照 god nodes 是否就是你想的「核心模組」；看社群數是否對應「pipeline / ops / tools」的實際分界。</li>
+<li><strong>寫進 AGENTS.md</strong>：照官方規則加入「先讀圖再回答 + 修改後 update」，讓未來協作者（含 AI agent）也走同一條路。</li>
+<li><strong>用圖回答真實問題</strong>：找一個「要改 <code>dedup.py</code> 影響誰」的假設問題，用 <code>graphify affected dedup</code> 或 path 走一遍，對照自己 grep 的結果。</li>
+<li><strong>檢討差異</strong>：圖答的與你預期的差在哪？那正是 <code>review.md</code> 精神——紀錄「圖哪邊誤導了你」。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：用「正在分析的工具」分析自己，是最嚴格的真實性測試——它強迫你面對圖的錯誤、快取的失效、以及「圖過期」的問題，比任何範例語料都有說服力。官方 AGENTS.md 直接示範：這個 workflow 不是玩具，是團隊日常。</div>
+
+<h2>② 深入原理擴充：為什麼 5993 行的 extract.py 值得讀、以及「純函數」的界線在哪</h2>
+<p>程式碼對照頁的規模很嚇人（extract.py 5993 行、cli.py 4044 行），但真正的結構不在行數：</p>
+<ul>
+<li><strong>extract.py 是「薄入口 + 大量註冊」</strong>：主流程 <code>extract()</code> 只有兩遍邏輯（逐檔 AST → 跨檔 import 解析），真正的工作在 per-language 的 <code>extract_&lt;lang&gt;</code> 與 <code>_import_*</code> 家族；0.3.0 重構後語言邏輯收斂進 extractors/（LanguageConfig + 通用引擎），extract.py 反而變「dispatcher」。</li>
+<li><strong>「沒有共享狀態」指的是模組間契約</strong>：每個函數收 dict/圖、回 dict/圖；但有兩處例外要記得——<code>graphify-out/</code>（唯一副作用出口）與快取目錄（<code>cache.py</code> 的讀寫）。測試「純函數」時要 mock 這兩個 I/O 點。</li>
+<li><strong>介面乾淨不等於實作簡單</strong>：<code>build_from_json</code> 有約 500 行 ID 正規化、ghost merge、shrink guard。讀 codebase 的秘訣是先讀「介面 + docstring + 測試」，再決定要不要進實作。</li>
+</ul>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：以為「<code>extract_&lt;lang&gt;</code> 存在，就代表該語言抽取得很完整」。實際上許多語言只做「結構抽取」（class/function/import），<strong>跨檔 calls 解析（Phase 2）需要 resolution 支援</strong>——冷門語言（Pascal、Terraform、Apex、Bash 的 source）沒有同等的跨檔解析深度。看到 <code>extract_bash</code> 只代表 Bash 有抽取器，不代表 Bash 的呼叫圖跨檔連得起來。判斷「這個語言支援到多深」要看 tests/fixtures 與 test_languages.py 有沒有對應的跨檔測例。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td>某語言抽取器存在但節點極少</td><td>該語言只有結構抽取、無跨檔解析；或語法太新 tree-sitter grammar 沒涵蓋</td><td>看 test_languages.py 有沒有該語言的測例；用 fixture 跑 extract 比對預期節點數</td></tr>
+<tr><td>trace 到一半找不到函數定義</td><td>函數在別的模組（extractors/engine.py、install.py 被 re-export）</td><td>用 <code>grep "def "</code> 全 repo 找；注意 <code>__main__.py</code> 的 re-export 連到 install.py</td></tr>
+<tr><td>改了純函數，測試卻失敗在「意外副作用」</td><td>函數偷偷寫了 graphify-out/ 或快取，測試 mock 不完整</td><td>檢查 <code>tmp_path</code> 是否被寫入；用 monkeypatch 隔離 cache/輸出路徑</td></tr>
+<tr><td>行數對不上教學頁</td><td>上游在 v8 後持續演進，badge-line 是快照</td><td>以 github 上的 blob URL 為準；行號只是定位輔助</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>「extract.py 5993 行」與「語言邏輯在 extractors/」兩件事並存。請在 repo 裡實測：以 Python 為例，畫出 <code>extract_python → _extract_generic → LanguageConfig</code> 的呼叫鏈，指出「引擎 vs 語言設定」真正的分界線在哪一行。</li>
+<li>「沒有共享狀態」有兩個例外（graphify-out/、cache）。如果要把 cache 也改成純函數（輸入輸出全由參數傳遞），函數簽名會變多複雜？值不值得？</li>
+<li>AGENTS.md 規定「先讀圖再回答」。請設計一個機制，當圖過期（graph.json 的 built_at_commit 落後 HEAD）時自動警示，避免 agent 用舊圖回答新問題。</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

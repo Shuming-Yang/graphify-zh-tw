@@ -186,6 +186,64 @@ communities = cluster(G)      # unchanged</code></pre>
 </div>
 <!-- End Tutorial Sections -->
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：每天自動更新的 1000 檔文件語料 + 增量排程</h2>
+<p>前面示範單機手動操作；這次是<strong>維運情境</strong>：你有一個團隊 wiki，每晚同步外部 repo + 筆記，1000 份 markdown 每天變動約 20 份，你要讓「建圖」變成無人值守的 nightly job，並控制成本。</p>
+<ol>
+<li><strong>首次全量建圖</strong>：<code>graphify extract corpus/</code> 產生 manifest + graph.json（費用較高的一次，可接受）。</li>
+<li><strong>夜間同步</strong>：cron 先 <code>rsync/git pull</code> 更新 corpus，再 <code>graphify extract corpus/</code>——自動偵測到 manifest + graph.json 存在 → 進入增量模式，只對 <code>new_files</code>（約 20 份）跑語意抽取，其餘 980 份走 semantic cache 命中。</li>
+<li><strong>觀察輸出</strong>：看「<code>incremental: 20 changed, 980 cached, 2 deleted</code>」這行——deleted 的檔案由 <code>build_merge(prune_sources=deleted_files)</code> 從圖中剪除。</li>
+<li><strong>改名處理</strong>：如果檔案只是改名，內容 hash 不變 → cache hit，且 <code>source_file</code> 自動更新到新路徑（AST/semantic cache 同模式）。</li>
+<li><strong>防錯設計</strong>：manifest 只在<strong>成功完成</strong>後寫入——凌晨當機也不弄壞下一次的 diff；設 <code>--max-spend</code> 防月結爆表。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：全量重建每天 1000 份 markdown 的 LLM 成本會吃掉預算；增量 + 語意快取把「每天成本」壓到「只算變動的 20 份」。自動偵測（無 flag）讓 cron 腳本極簡，manifest 的「成功才寫入」語義讓排程可重啟、可當機、不會腐敗。這條路徑示範了「建圖系統」要長期維運所需的工程細節。</div>
+
+<h2>② 深入原理擴充：manifest 契約、build_merge、與「圖比檔案更舊」的一致性保證</h2>
+<p>增量不是「少做一點」的優化，而是<strong>一套一致性契約</strong>：</p>
+<ul>
+<li><strong>manifest.json 是 diff 的真相來源</strong>：它記錄上次成功執行後「哪些檔案算數」。只有成功完成才寫入，所以「圖 + manifest」永遠是同一份快照；中途當機時，下次以舊 manifest 為基準，頂多多抽幾個檔，不會漏。</li>
+<li><strong>build_merge 比 build 複雜在有「存活邊」</strong>：changed 檔案指到 unchanged target 的跨檔邊必須保留；被 prune 的 source 產生的節點與邊要剪掉；還要跟 shrink guard（新圖不得更小）與 manifest 的一致性校驗互動。</li>
+<li><strong>Semantic cache 的 key 是「內容 hash + prompt fingerprint」</strong>：prompt 一改（比如 extraction-spec 調整），fingerprint 變，快取自動失效——這防止「舊 prompt 抽的結果在新 prompt 下被當新資料」。這是很多人忽略的失效條件。</li>
+<li><strong>去重的順序依賴</strong>：<code>deduplicate_entities</code> 在 <code>build_merge</code> 之後、<code>cluster</code> 之前——圖越乾淨，社群偵測越好；但這也意味著「社群會因為去重結果而漂移」，跨版比較社群數時要小心。</li>
+</ul>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：以為「增量模式 = 只處理變更檔，所以社群不變」。實際上 <code>cluster</code> 是<strong>每次全圖重跑</strong>（設計文件明寫 "cluster (full graph, always re-run)"）。加上去重可能把節點合併，社群數和社群成員每次都可能微調。若你把「社群穩定」當成「系統沒壞」的指標，會誤判——社群漂移是正常行為，<em>社群 ID 跨跑漂移才該查</em>（那是確定性失效）。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td>每次執行都顯示全量重建</td><td>manifest.json 或 graph.json 被刪/被清（CI 工作目錄沒持久化）</td><td>把 <code>graphify-out/</code> 放進持久化 volume；確認不跑 <code>--no-cache</code></td></tr>
+<tr><td>改 prompt 後快取仍命中</td><td>semantic cache key 沒含 prompt fingerprint</td><td>檢查 <code>prompt_fingerprint</code> 是否納入 key；版本化你的 extraction-spec</td></tr>
+<tr><td>檔案改名後出現「ghost 節點」</td><td>改名但內容變了 → cache miss，舊節點未 pruned</td><td>確認 manifest 正確偵測 deleted + new；檢查 <code>build_merge</code> 的 prune_sources</td></tr>
+<tr><td>圖節點數不減反增（刪了一堆檔）</td><td>deleted_files 偵測失敗（檔案被移到 ignore 目錄？）或 prune 沒生效</td><td>看 detect_incremental 的 deleted 清單；確認沒被 ignore 規則吃掉</td></tr>
+<tr><td>合併後社群「亂成一團」</td><td>去重把不同實體誤併（Jaro-Winkler 閾值太鬆、缺社群加分護欄）</td><td>檢查去重步驟 4/5 的門檻；考慮 <code>--dedup-llm</code> 仲裁 0.75–0.85 歧義對</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>manifest 的「成功才寫入」確保 diff 一致性。請設計一個失敗注入實驗（在 build_merge、cluster、write 三點各掛一次），證明不管在哪裡當機，下次跑都能安全恢復。</li>
+<li>七步去重的 Step 5「同社群加分 +0.05」仰賴「先有社群、再去重」；但 pipeline 是「先去重、再 cluster」。這個看似矛盾的依賴怎麼被解決的？它對第一次建圖（無既有社群）的影響是什麼？</li>
+<li>「社群永遠重跑」與「增量建圖」同時存在。若要讓社群在只改 1 個檔案時<em>盡可能不漂移</em>，你會採用哪種策略：固定 seed 重跑、接續舊社群標籤、還是凍結社群只在季度重建？各有哪些代價？</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

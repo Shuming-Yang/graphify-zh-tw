@@ -105,6 +105,63 @@
 <div class="callout"><strong>看完這頁你應該能說出</strong>：fixtures 怎麼支援 30+ 語言、capsys 測了什麼、為什麼要預先算好快取 fixture。測試策略與「<a href="../architecture.html">新增一個語言</a>」的貢獻流程直接呼應——加語言就要加 fixture + <code>test_languages.py</code> 測例。</div>
 </div>
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：用 fixture 驅動的方式為新語言寫測試</h2>
+<p>前面是「看懂測試策略」；這次是<strong>動手補測試</strong>：你剛在 extractors 頁加完 Kotlin 支援，現在要用「同一個 fixture 通吃所有語言」的紀律把它測好。</p>
+<ol>
+<li><strong>寫 sample.kt</strong>：仿照 <code>sample.py</code> 的結構——一個 class、幾個函數、跨檔 import、型別註解，讓斷言可以「同構」對應其他語言。</li>
+<li><strong>加跨檔 fixture</strong>：若是跨檔解析測例，建 <code>kotlin_cross_file/</code> 目錄（仿 <code>swift_cross_file/</code>），驗證 Phase 2 的類別級 INFERRED 邊。</li>
+<li><strong>加 test_languages.py 測例</strong>：斷言「sample.kt 抽出 N 個 class、M 個 function、import 邊存在」；若該語言支援跨檔解析，加 <code>test_kotlin_cross_file_calls</code>。</li>
+<li><strong>驗證快取路徑</strong>：若測「快取載入 → 建圖」，把預先抽取結果放 <code>graphify-out/cache/</code> fixture——測試不必每次真跑 tree-sitter，也順便鎖住快取格式。</li>
+<li><strong>全量回歸</strong>：<code>pytest tests/ -q</code>——確認 140+ 檔沒被新 fixture 弄壞（尤其同名檔衝突、大小寫敏感檔案系統）。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：fixtures 的策略讓「<strong>新增語言的成本 = 新增 fixture + 新增測例</strong>」，而不是重寫一整套測試。共用樣本也讓「語言間的一致性」可比較——Kotlin 抽得比 Python 差時，同樣的斷言會立刻暴露差異。測試不只是驗證，還是「語言的深度契約」。</div>
+
+<h2>② 深入原理擴充：capsys、確定性測試、與「測試即契約」</h2>
+<p>tests 頁最容易被跳過的是三個「非典型」測試技巧：</p>
+<ul>
+<li><strong>capsys 測副作用</strong>：<code>test_cluster_does_not_write_to_stdout</code> 用 pytest 的 <code>capsys</code> 驗證 cluster 不寫 stdout、stderr 不含 ANSI 碼——直接對應 cluster.py 的「擋 graspologic 進度條」行為（issue #19）。<em>測「不該發生的事」</em>和測「該發生的事」一樣重要。</li>
+<li><strong>確定性測試</strong>：<code>remap_communities_to_previous</code> 驗證社群重跑時重用舊 ID、新社群給確定性新 ID——把「重現性」變成可測試的契約，不是口號。</li>
+<li><strong>預先算好的快取 fixture</strong>：<code>graphify-out/cache/&lt;sha&gt;.json</code> 讓測試載入「已知抽取結果」而不是真的解析——快了很多，且順帶鎖住「快取格式的相容性」（改格式這裡會炸）。</li>
+</ul>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：以為「測試全綠 = 抽取正確」。140+ 個測試檔覆蓋的是<strong>「已知的」語言與「已寫測例的」結構</strong>——一個你沒測的語法（Kotlin 的 inline function、Swift 的 @available 條件）抽錯時，測試照樣全綠。<code>sample.*</code> fixture 只有一份「樣本」，不代表整個語言。最經典的誤判：新增語言後 <code>pytest tests/ -q</code> 全過，就宣稱「Kotlin 支援完成」——實際上只完成「sample.kt 支援完成」。真實語料的語法變體，要靠「把真實 repo 當 fixture」的 integration 測試才抓得到。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td>測試在 macOS 上「多出」一堆失敗</td><td>大小寫不敏感檔案系統讓 sample.f90 / sample.F90 撞檔</td><td>在 Linux/Docker 跑該測例；或把區分移到目錄層級</td></tr>
+<tr><td>新 fixture 造成別語言測試爆炸</td><td>fixture 檔名撞名（同名 .py/.ts 樣本被誤抓）或 registry 共享狀態</td><td>檢查 fixture 命名唯一性；跑單一測試檔對比爆炸範圍</td></tr>
+<tr><td>測「快取載入」時測例極慢</td><td>沒用預算好的 cache fixture，真的在跑 tree-sitter</td><td>把抽取結果預先放進 <code>graphify-out/cache/</code> fixture</td></tr>
+<tr><td>改了 cluster 的 ANSI 處理，測試卻沒抓到</td><td>沒有 capsys 測例覆蓋「不寫 stdout」契約</td><td>仿 <code>test_cluster_does_not_write_to_stdout</code> 補測</td></tr>
+<tr><td>某語言「實際 repo」抽錯但測試全綠</td><td>sample fixture 太簡單，沒涵蓋該語言語法變體</td><td>把真實 repo 縮小成 fixture 加進 tests；補 integration 層測試</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>capsys 驗證「cluster 不寫 stdout」。請列出這個契約可能被破壞的「非預期途徑」（例如 C 擴充、第三方套件直接寫 fd），並設計一個比 capsys 更強（甚至跨行程）的驗證方式。</li>
+<li>fixtures 是「一語料庫、多語言」的樣本。如果兩個語言該抽出的抽象數天生不同（Kotlin 的 data class vs Python 的 dataclass），「同構斷言」該怎麼寫才不會過度耦合或過度寬鬆？</li>
+<li>「測試全綠 ≠ 抽取正確」。請為 graphify 設計一個「語法覆蓋率」指標：怎麼量化「這個語言有多少語法變體沒被 fixture 涵蓋」？</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

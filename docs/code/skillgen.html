@@ -117,6 +117,64 @@ python -m tools.skillgen --bless          # 用目前渲染重寫 expected/</cod
 <p class="hint">下一頁：<a href="gen-demo-path.html">scripts/gen_demo_path.py</a>——README 首圖 SVG 動畫的生成器。</p>
 </div>
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：用 skillgen 管理「自家多平台 skill」的版本升級</h2>
+<p>前面是「看懂 render/check/bless」；這次是<strong>把它當版本管理工具</strong>：你的公司 fork 了 graphify，改了一堆 fragments（加了內部工具指引），現在上游釋出新版，你要安全升級。</p>
+<ol>
+<li><strong>凍結現況</strong>：先 <code>python -m tools.skillgen --check</code> 確認 fork 的產物與 expected/ 一致（drift 歸零才談升級）。</li>
+<li><strong>拉上游、對帳 diff</strong>：merge 上游的 fragments/ 變更——用 <code>--audit-coverage</code> 驗證「每個 host 的 v8 body 每個 heading 仍單一居住在自己的渲染裡」，抓到「上游改了某段、卻漏接進你 fork」的情形。</li>
+<li><strong>衝突處理</strong>：上游改了「你改過」的 fragment → 人工三方合併（上游版 + 你的版 + 共同基底），改回 fragments 而非產物。</li>
+<li><strong>重渲染 + 驗證</strong>：<code>python -m tools.skillgen</code> 重產所有平台 → <code>--check</code> 過 → <code>--schema-singleton</code> 確認 file_type enum 全站 byte-identical → <code>--monolith-roundtrip</code> 確認 monolith 重現。</li>
+<li><strong>commit 三件套</strong>：fragments + 產物 + expected/ 一起 commit（baseline 更新）。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：skill 檔是 generated artifacts，若直接改 SKILL.md，上游每次升級都會與你的修改衝突、且無法稽核。從 fragments 走的升級是「<strong>三方合併一次、重渲染全部、驗證套組兜底</strong>」——audit/roundtrip 那組驗證讓「拆分 17 個平台」這件事安全到可以被 CI 執行。</div>
+
+<h2>② 深入原理擴充：check vs bless vs audit——三種「防 drift」的層次</h2>
+<p>skillgen 的防護常被混為一談，其實是三個不同層次：</p>
+<ul>
+<li><strong>check（byte-diff）</strong>：渲染結果 vs 已提交檔案 vs expected/——抓「手改了產物」或「fragment 改了沒重產」。最便宜、最基礎，CI 用這個。</li>
+<li><strong>bless（接受現況）</strong>：把目前渲染寫進 expected/——「這是我承認的真相」。改模板時先 bless 再 commit，否則 check 永遠過不了。bless 不是修 bug 的工具，是「確認新 baseline」的工具。</li>
+<li><strong>audit_coverage（內容覆蓋）</strong>：用 <code>_V8_BASELINE_SHA</code> 拉 v8 分支的原始 skill body，逐 host 驗證「每個 heading 都單一居住在自己渲染裡」——抓「只影響單一 host 的漏接」，這是 byte-diff 抓不到的一層（byte-diff 只驗證「一致」，不驗證「該在的內容有在」）。</li>
+<li><strong>roundtrip 家族</strong>：monolith / always_on / schema-singleton——驗證「重組後的內容能重現舊常數」，保護「拆分 platform」這個重構不悄悄丟內容。</li>
+</ul>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：以為「<code>--bless</code> 通過 = 產物正確」。bless 只代表「<em>目前渲染與我承認的 baseline 一致</em>」——它完全不知道「渲染邏輯本身有沒有 bug」。常見誤用：某個 fragment 放錯位置（例如把 claude 專屬的 section 寫進 shared/），render 照樣輸出、check 照樣過、bless 照樣接受——直到 <code>--audit-coverage</code> 或人工發現「claude 的 SKILL.md 混進了 codex 的內容」。bless 前先跑 audit/roundtrip，不要只靠 check。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td><code>--check</code> 一直 exit 1</td><td>產物被手改、或 fragment 改了沒重產</td><td><code>python -m tools.skillgen</code> 重產；確認後 <code>--check</code> 過；不要手改產物</td></tr>
+<tr><td>bless 後 <code>--check</code> 仍失敗</td><td>expected/ 的命名路徑與實際產物路徑不一致</td><td>對照 <code>_expected_path</code> 命名（<code>graphify__skill.md</code> 等）；確認 bless 寫對位置</td></tr>
+<tr><td>某平台內容缺一段（check 卻過）</td><td>該段被放在不屬於它的 fragment 或 shared/ 漏接</td><td>跑 <code>--audit-coverage</code>；逐 heading 對照 v8 baseline 找「漏接」</td></tr>
+<tr><td>description 各平台不同步</td><td>某平台覆寫了 description（platforms.toml 設了不同值）</td><td>確認 platforms.toml 的 description 為「PRESERVED VERBATIM」；統一單一來源</td></tr>
+<tr><td>新增平台後部分驗證炸掉</td><td>新平台的 hook_variant/shell 組合沒被 roundtrip 覆蓋</td><td>為新平台補 monolith/always_on roundtrip；確認 expected/ 有該平台 baseline</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>audit_coverage 用「heading 單一居住」驗證內容歸位。請設計一個反例：一個 heading 內容「分成兩半、各住不同 host 的渲染」——audit 能抓到嗎？若要抓，需要什麼更強的驗證？</li>
+<li>「bless 前先跑 audit/roundtrip」。請設計一個 CI gate 流程，把 check/audit/roundtrip/bless 的執行順序與人工確認點排成一個可操作的 PR 檢查表。</li>
+<li>fragments 是「單一來源」，但 17 個平台仍可能各有 shell/hook 差異。如果「同一個 fragment 的文字」在不同平台該有微妙的用字差異（例如 UK/US 英文），你會引入「條件式 fragment」還是「多來源 + 合併」？分析兩者的維護成本。</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

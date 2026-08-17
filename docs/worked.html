@@ -201,6 +201,64 @@ graphify extract ./raw     # 純程式碼，不需 API key
 </div>
 <!-- End Tutorial Sections -->
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：用 graphify 產出一份新接手 repo 的 onboarding 指南</h2>
+<p>前面是「跑完 httpx 案例」；這次換成<strong>真實的職場任務</strong>：你被指派接手一個陌生的大型開源 repo，要在三天內產出一份「架構 onboarding 指南」給團隊。</p>
+<ol>
+<li><strong>Clone 與建圖</strong>：<code>graphify clone &lt;github-url&gt;</code> 抓 repo，<code>graphify extract .</code> 建圖（程式碼零 LLM）。對大 repo 先注意 detect 的 warning——語料過大會提示成本。</li>
+<li><strong>先讀報告</strong>：直接打開 <code>graphify-out/GRAPH_REPORT.md</code>——god nodes 告訴你核心抽象（如 <code>Client</code>、<code>Request</code>），社群清單告訴你子系統邊界。</li>
+<li><strong>追重要路徑</strong>：用 <code>graphify path "入口" "核心元件"</code> 還原「request 怎麼流進核心」；用 <code>graphify explain &lt;god-node&gt;</code> 理解單一抽象。</li>
+<li><strong>交叉驗證</strong>：對照報告的 Surprising Connections（跨社群耦合）與 Import Cycles（循環依賴，架構風險），在指南裡標註「這裡是技術債」。</li>
+<li><strong>寫進 onboarding</strong>：把「讀 GRAPH_REPORT → 追 path → 看 cycles」變成新人 SOP，附上互動 graph.html 連結。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：onboarding 的痛點是「原始碼太多、不知道從哪讀」。圖把「最有價值的 10% 結構」先攤開——god nodes 是閱讀優先序、社群是子系統地圖、cycles 是風險清單。三天內從零到指南，靠的就是「建圖一次、之後全讀圖」而不是逐檔看原始碼。</div>
+
+<h2>② 深入原理擴充：god nodes 的「排除藝術」與報告的稽核性質</h2>
+<p>「god node = 最高度數節點」看似簡單，但 analyze.py 的真正功夫在「<strong>排除誰</strong>」：</p>
+<ul>
+<li><strong>排除檔案級 hub</strong>（<code>_is_file_node</code>）：檔案節點機械式累積 import/contains 邊，不是架構抽象。</li>
+<li><strong>排除概念節點與 JSON key 節點</strong>：它們是刻意加入的，不是被發現的。</li>
+<li><strong>排除內建型別雜訊</strong>（<code>_BUILTIN_NOISE_LABELS</code>）：0.8.33 修過一個 bug——<code>str</code>、<code>int</code>、<code>MagicMock</code> 曾灌爆度數把真抽象擠出排名。所以「god node」的定義是「排除後的最高度數」，不是「最高度數」。</li>
+</ul>
+<p>報告每一段都由圖資料計算出來，不是 LLM 生成的故事——god nodes 的 degree、EXTRACTED 比例、token 成本都可回溯。這就是「稽核軌跡」：<em>報告可信，因為每個數字都有出處</em>。而 <code>review.md</code> 的存在（每個案例誠實寫出「圖哪裡搞錯了」）是這份可信度的文化層補充——連官方都承認圖會錯，你更該養成「懷疑圖、回去查邊」的習慣。</p>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：以為「節點數 = 檔案數 × 平均抽象數，所以 3903 節點代表 3903 個真實概念」。實際上節點數受<strong>抽取粒度與去重結果</strong>影響：一個類別 + 它的每個方法都是節點，rationale（docstring）也是節點，檔案節點也計入；而 dedup 可能把幾個 label 併成一個。不同 repo 的節點數<strong>不能直接比大小</strong>。看案例時要比「god nodes 是否合理、社群是否對應子系統」，而不是比誰的節點多。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td>互動圖載入很慢或瀏覽器卡死</td><td>graph.html 太大（rsl-siege-manager 已 1.8MB；節點破萬）</td><td>用 <code>_viz_node_limit</code> 防護先確認上限；縮小語料或改用 graph.json + 其他視覺化工具</td></tr>
+<tr><td>報告數字與 README 宣稱不符</td><td>graphify 版本不同（上游 v8 vs 本地新版）或跑了 <code>--code-only</code></td><td>對齊版本（案例標註 built_at_commit）；確認是否跳過 Pass 3</td></tr>
+<tr><td><code>graphify path A B</code> 找不到路徑</td><td>節點名是檔案節點而非抽象節點、或兩個節點真的不相連</td><td>先用 <code>graphify query</code> 確認節點存在與正確 label；換同社群內節點對試</td></tr>
+<tr><td>god nodes 出現 <code>str</code>/<code>int</code> 之類</td><td>用的是舊版 graphify（0.8.33 前的 builtin noise bug）</td><td>升級 graphify 重跑 analyze；確認 <code>_BUILTIN_NOISE_LABELS</code> 生效</td></tr>
+<tr><td>自己重現的社群數對不上案例</td><td>上游 v8 的圖由特定 commit 建出（6085fd66），社群編號含隨機性</td><td>固定 seed（確定性）重跑；比「社群是否對應子系統」而非比編號</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>用「排除後的最高度數」定義 god node。請設計一個反例：一個真正的核心抽象，可能被哪一種排除規則誤殺？如果要加一條「救回」規則，你的判據是什麼？</li>
+<li>案例的 review.md「誠實寫出圖哪裡搞錯」。請瀏覽任一案例的 review.md，挑出一個錯誤類型，並推測它在哪個 pipeline 階段（抽取/解析/去重/分群）被引入。</li>
+<li>「節點數不能跨 repo 比」。請定義一個「可跨 repo 比的架構指標」（如 god node 集中度、社群凝聚力分佈），並說明它的計算方式與可能的偏誤。</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

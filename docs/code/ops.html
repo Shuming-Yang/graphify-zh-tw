@@ -270,6 +270,64 @@
 </div>
 <!-- End Tutorial Sections -->
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：為「每日同步的內部 wiki」架設快取 + 增量 + 監控</h2>
+<p>前面是「測試 cache 與 dedup」；這次是<strong>把它們串成一個維運系統</strong>：你的內部 wiki 有 1000 份 markdown + 幾個 SQLite 資料 dump，每晚從上游同步，你要保證「圖每天新鮮、成本受控、壞了能自癒」。</p>
+<ol>
+<li><strong>啟用增量</strong>：<code>graphify extract wiki/</code> 讓 manifest 建起來；之後 nightly 重跑自動走 <code>detect_incremental</code>——只抽 new_files，其餘 semantic cache 命中。</li>
+<li><strong>SQLite 資料的處理</strong>：把資料 dump 轉成可分析的 markdown/CSV 進語料（SQLite 本身不是抽取目標）——或用 docker-mcp-sqlite 那套把結果倒進 SQLite 供即席查詢。</li>
+<li><strong>監控健康</strong>：檢查 nightly 輸出行的三個數字——<code>changed / cached / deleted</code>；deleted 突增代表上游砍了大量文件，<code>build_merge(prune_sources=deleted)</code> 會自動剪圖。</li>
+<li><strong>成本治理</strong>：設 <code>--max-spend</code>；觀察每週 token 統計，若「cached」比例長期偏低，檢查 prompt_fingerprint 是否意外失效。</li>
+<li><strong>自癒流程</strong>：快取損壞（corruption）時清 <code>graphify-out/cache/</code> 重抽；serve 的 <code>_load_graph</code> 對壞 graph.json 印復原訊息而不是當機。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：這是 ops 層七支模組的「合體技」——cache 省錢、dedup 保圖乾淨、ingest 進料、watch 可換成排程、serve 對外、security/validate 把關。單獨測每個函數只能證明「能動」，把它們串成 nightly job 才證明「能維運」。</div>
+
+<h2>② 深入原理擴充：dedup 的「生還者選擇」為什麼是 issue #1851</h2>
+<p>dedup 最容易被誤解的細節是「合併時誰活下來」：</p>
+<ul>
+<li><strong>生還者必須與「到達順序」無關</strong>：<code>_collision_rank</code> 提供總序——每個 ID 只留「<em>定義</em>它的節點」（source_file 就是 ID 編碼的檔），不是「第一個看到的」。這樣 chunk 順序/平行執行順序不會決定誰生還，輸出才可重現。</li>
+<li><strong>同源重複的屬性要補全</strong>：AST 抽的結構與語意抽的補充屬性能共存到生還者，避免合併後丟失「半邊資訊」。</li>
+<li><strong>跨專案防護在第一步</strong>：節點帶 <code>repo</code> 欄位且超過一個 repo → 直接 raise。不同 repo 的 <code>Account</code> 撞名是巧合，<em>絕不能靠字串相似度合併</em>——這是去重的「紅線」。</li>
+<li><strong>門檻是可調的保守</strong>：entropy &lt; 2.5 bits/char 跳過、Jaro-Winkler ≥ 0.92、同社群 +0.05、0.75–0.85 的歧義對才送 <code>--dedup-llm</code> 仲裁。</li>
+</ul>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：以為「dedup 只做字串相似度，所以同名的一定會合併」。實際上<strong>同名不一定合併、異名也可能誤併</strong>：熵門檻擋掉 <code>AI</code>/<code>DB</code> 這種短歧義名（太危險不自動併）；而 Jaro-Winkler 只看字元相似，<code>UserRepository</code> 與 <code>UserRepo</code> 可能因「同社群加分」跨過門檻被誤併——尤其當兩者真的在同一個社群（經常 co-occur）時，+0.05 可能就是壓垮駱駝的那根稻草。判讀去重結果，要看「生還者 label 是否涵蓋原意」而不是「看起來像不像」。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td>cache 命中率長期偏低</td><td>prompt_fingerprint 隨每次 prompt 變動（未版本化 extraction-spec）或內容 hash 含非內容欄位</td><td>版本化 prompt；確認 <code>file_hash</code> 用 <code>_body_content</code> 不含路徑</td></tr>
+<tr><td>dedup 把明顯不同的概念合併</td><td>Jaro-Winkler 太鬆 + 同社群加分疊加跨過門檻</td><td>調高閾值或檢查社群加分是否該納入；考慮 <code>--dedup-llm</code> 仲裁</td></tr>
+<tr><td>跨 repo 合併圖時 raise</td><td>dedup 的跨專案防護啟動（不同 repo 撞名）</td><td>這是紅線防護——改用 merge-graphs 工具而非靠 dedup 併</td></tr>
+<tr><td>serve 讀到「損壞的 graph.json」</td><td>寫入中斷（沒走原子寫）或外部工具改壞格式</td><td>重新 <code>graphify extract</code>；確認 export 走 <code>write_json_atomic</code></td></tr>
+<tr><td><code>watch</code> 熱循環（重建一直觸發）</td><td>重建過程自己寫入 watched 目錄，或 pending 佇列沒 drain</td><td>確認 <code>_queue_pending</code>/<code>_drain_pending</code> 落地；檢查 <code>_rebuild_lock</code> 是否生效</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>「生還者 = 定義該 ID 的節點」確保與到達順序無關。請設計一個反例：什麼情況下「定義者」也會有歧義，導致生還者仍不唯一？<code>_collision_rank</code> 需要補什麼 tiebreak？</li>
+<li>跨專案防護直接 raise。如果產品需求變成「同 repo 內允許跨子專案去重、跨 repo 禁止」，你會把這條規則參數化還是拆成兩個函數？為什麼？</li>
+<li>prompt_fingerprint 的取捨是「prompt 改 → 快取全失效」。若你改了 extraction-spec 一個字，1000 份文件全部要重抽。請設計一個「部分失效」策略：怎麼讓快取只對「語意相關的欄位」失效？</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

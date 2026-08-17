@@ -166,6 +166,58 @@ Rules:
 </div>
 <!-- End Tutorial Sections -->
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：為 8 語言 monorepo 架設 CI 自動建圖管線</h2>
+<p>與前面的「從零跑完 pipeline」不同，這次的情境是<strong>長期、自動、可稽核</strong>：你維護一個 200+ 檔、8 種語言（Python/TS/Go/Rust/SQL/Bash/Java/Pascal）的 monorepo，團隊要「每次 merge 之後圖自動更新、PR 時能看到這支 PR 影響哪些節點」。</p>
+<ol>
+<li><strong>建立 repo 慣例</strong>：在 repo 根目錄放 <code>.graphifyignore</code>（排除 build 產物與 vendor 目錄），並在 AGENTS.md 註明「先讀 <code>graphify-out/GRAPH_REPORT.md</code> 再回答」。</li>
+<li><strong>首次全量</strong>：<code>graphify extract .</code>——純程式碼語料，Pass 3 被跳過，建圖零 LLM、可確定性重現。</li>
+<li><strong>裝 commit hook</strong>：<code>graphify hook install</code>（或對應平台的 PreToolUse hook）——每次 git commit 自動跑 <code>graphify update .</code>，走 <code>build_merge</code> 增量路徑，只有變更的檔案被重抽。</li>
+<li><strong>PR 影響分析</strong>：用 <code>graphify path</code> / <code>graphify explain</code> 回答「改 <code>parser.py</code> 會波及誰」——甚至配合 <code>graphify update</code> 產生的 <code>graph_diff</code> 輸出對比 base branch。</li>
+<li><strong>CI 把關</strong>：在 CI 跑 <code>graphify extract --check-drift</code>（或對照 <code>built_at_commit</code>）確認圖跟得上程式碼，防止「圖過期」。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：這是「程式碼永不離開機器」的主場——8 種語言全部走 tree-sitter 確定性抽取，零 token、可重現、可 commit 進 repo。相較於把整份語料每次送 LLM，增量 + SHA256 快取讓每次 merge 的建圖成本趨近於零，而且「圖與 commit 綁定」讓團隊永遠知道圖的新鮮度。</div>
+
+<h2>② 深入原理擴充：純函數 pipeline 背後的「隱形正確性工程」</h2>
+<p>架構頁說「每個模組只管一件事、介面乾淨」，但「乾淨介面」不等於「資料一定對」。真正讓圖正確的是藏在函數裡的防護：<code>build_from_json</code> 的 500 行裡有 <strong>ID 正規化</strong>（非字串 ID、legacy <code>_semantic_id_remap</code>、doc/AST twin 重映射）、<strong>檔名消歧</strong>（不同目錄同名檔加最短唯一後綴）、<strong>shrink guard</strong>（新圖更小就拒絕覆寫）。<code>validate.py</code> 在 build 前強制 schema；<code>security.py</code> 在 ingest 前消毒 URL。換句話說：<em>「正確」是防護網疊出來的，不是純函數自動保證的</em>。</p>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：很多人以為「<code>build_graph()</code> 之後的圖就是對的，可以直接查」。實際上 <strong>跨檔 calls 邊只對「有 resolution 支援」的語言成立</strong>——resolution.py 寫了 tsconfig alias、workspace packages、JS 路徑解析，但冷門語言（Pascal、Terraform、Apex）沒有同等級的跨檔解析，它們的 import 邊可能<strong>停在檔案級、不會精確指到類別</strong>。因此「某條 <code>calls</code> 邊是 EXTRACTED」只代表 AST 有證據，不代表端點解析正確。查圖時看到斷掉的邊，先懷疑 resolution 而非懷疑抽取。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td>CI 中 <code>graphify extract</code> 每次重抽全部檔案</td><td>沒進入增量模式：<code>graphify-out/manifest.json</code> 或 <code>graph.json</code> 缺失；或命令列誤加 <code>--no-cache</code></td><td>確認 manifest + graph.json 都在；移除 <code>--no-cache</code>；首次跑永遠全量是正常</td></tr>
+<tr><td>新增語言後 dispatch 沒生效</td><td>副檔名只註冊了一半：<code>_DISPATCH</code>、<code>CODE_EXTENSIONS</code>、<code>_WATCHED_EXTENSIONS</code> 三處沒同步</td><td>對照「新增語言 5 步驟」逐一檢查註冊點；重跑 detect 看分類結果</td></tr>
+<tr><td>某些檔案「默默消失」不出現在圖</td><td>detect 過濾生效：noise 目錄、ignore 規則、敏感檔被排除</td><td>看 <code>detect()</code> 回報的 <code>skipped_sensitive</code> / <code>ignored</code> / <code>unclassified</code> 欄位，而不是猜</td></tr>
+<tr><td>圖節點數比上次少，export 卻不報錯</td><td>shrink guard 已擋下覆寫（回傳 False）但呼叫端沒檢查</td><td>確認上一輪 chunk 檔未遺失；檢查 <code>to_json</code> 回傳值；確認後再 <code>--force</code></td></tr>
+<tr><td><code>ModuleNotFoundError</code> 只發生在某一語言</td><td>該語言的 tree-sitter grammar 是 optional extra（<code>[sql]</code>、<code>[pascal]</code>、<code>[terraform]</code>）</td><td>裝對應 extra：<code>pip install "graphify[sql]"</code> 等</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>只靠改 <code>LanguageConfig</code>、不改 engine.py，能否支援一種全新語言？請指出哪些語言特性（如 C# partial class、Swift extension）<em>必然</em>要動 engine，並說明理由。</li>
+<li>假設你想在 cluster 與 analyze 之間插入「自訂節點排序」步驟。以「沒有共享狀態」的介面原則，這個步驟的函數簽名該長什麼樣？輸入輸出為何？</li>
+<li>build.py 保留「被取代的 <code>deduplicate_by_label</code>」並用 docstring 說明為何不用。你認為「保留死碼 vs 刪除死碼」的工程取捨，在開源專案裡該如何拿捏？</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

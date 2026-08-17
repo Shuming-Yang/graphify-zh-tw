@@ -77,6 +77,64 @@
 <p class="hint">實際產出：<code>assets/demo-path.svg</code>（本站首頁使用，來源標註於 <a href="../../about.html">關於</a>）。</p>
 </div>
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：把「產品 demo 資產」變成可重生的 CI 產物</h2>
+<p>前面是「看懂 reveal() 動畫」；這次是<strong>把整組行銷/文件圖檔變成 build artifact</strong>：你的團隊 README、首頁、說明文件各處都用到圖，圖的資料每次重跑 graphify 後都會變，你不想手工重畫。</p>
+<ol>
+<li><strong>寫一個「重生」腳本</strong>：串起 <code>python3 scripts/gen_demo_path.py</code> + 你自製的其它視覺化產生器（社群餅圖、god-node 排行 SVG），統一輸出到 <code>assets/</code>。</li>
+<li><strong>接上 CI</strong>：graph.json 每次重建後，CI 跑重生腳本——資產永遠跟上最新圖資料，不靠人工重畫。</li>
+<li><strong>用 STATIC 模式做視覺 QA</strong>：<code>STATIC=1</code> bake 靜態 frame 進 PR——reviewer 不需開瀏覽器看動畫，直接看靜態圖檢查「路徑對不對、節點位置合不合理」。</li>
+<li><strong>版本化資產</strong>：資產 commit 進 repo（像 skill 產物一樣是 generated artifact），出錯時 <code>git diff assets/</code> 就能看到「哪次資料變化改動了視覺」。</li>
+<li><strong>效能檢查</strong>：SVG 走純 SMIL/CSS、無 JS、無外部字型——能在 GitHub sanitizer 與 <code>&lt;img&gt;</code> 下正常顯示，避免「gif/JS 動畫在很多環境被擋」的相容問題。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：「把 demo 當程式化資產」讓「資料更新 → 圖更新 → 文件更新」一條龍，且每張圖都可稽核（git diff）。相較於手工繪圖，重生的圖保證「與真實現況一致」——這對教學站尤其重要：教程裡的圖講解與實際產出不會脫節。</div>
+
+<h2>② 深入原理擴充：SMIL/CSS 動畫的「約束驅動設計」與 reveal() 的時間軸</h2>
+<p>gen_demo_path.py 真正的價值在「<strong>在約束下設計</strong>」：</p>
+<ul>
+<li><strong>純 SMIL/CSS</strong>：SVG 要能放進 <code>&lt;img&gt;</code> 且過 GitHub sanitizer——所以不能用 JS、不能用外部字型、不能有外部資源。這逼出「<code>&lt;animate&gt;</code> 內嵌」的方案，也讓檔案可離線、可內嵌、零依賴。</li>
+<li><strong>單一 10 秒主週期</strong>：每個 <code>&lt;animate&gt;</code> 都是 <code>dur=10s repeatCount=indefinite</code>——循環點前回到起始狀態，無縫迴圈。時間軸是「全域對齊」的，不是各自獨立計時，否則跳動會逐漸錯位。</li>
+<li><strong>reveal(t, hold, start)</strong> 是節拍器：<code>kt()</code> 把 (keyTime, value) 對轉成 keyTimes/values；<code>reveal()</code> 產生「t 秒亮起 → 保持 → 循環前淡出」的 opacity 動畫——路徑逐跳點亮的「脈衝」感，就是每個 hop 的 reveal 時間錯開造成的。</li>
+<li><strong>STATIC=1 是「視覺 debug 模式」</strong>：把初始 opacity 設為 1，bake 靜態 frame——用眼睛檢查版面，不用播放動畫。</li>
+</ul>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：以為「<code>docs/demo-path.svg</code> 與 graph.json 是同一份資料的直譯」。其實它是<strong>人為挑選的一條 path 的「示意演出」</strong>——腳本裡寫死要展示 <code>graphify path "FastAPI" "ModelField"</code> 這條路徑，節點位置、動畫時序都是編排的。它「看起來像」即時渲染，但資料若換了，這條路徑可能不存在、SVG 畫出來的就是假的。真正「即時從圖算路徑」的是 graph.html；SVG 是「劇本」。看 SVG 講解時要記得它是 demo artifact，不是 data snapshot。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td>SVG 在 GitHub 上不顯示動畫</td><td>用了 JS 或外部資源（sanitizer 會擋）</td><td>確保全在 SMIL/CSS 內嵌；<code>&lt;animate&gt;</code> 不依賴外部腳本</td></tr>
+<tr><td>動畫循環處「跳一下」</td><td>循環點前沒回到起始狀態，或各 animate 時間軸沒對齊</td><td>檢查 reveal 的 start 參數；確認所有 dur 都是同一主週期</td></tr>
+<tr><td>demo 路徑在圖裡已不存在</td><td>資料更新後，寫死的 <code>FastAPI→ModelField</code> 這條路徑消失了</td><td>把 demo 路徑參數化（讀 graph.json 驗證存在再畫）；或選一條穩定的主路徑</td></tr>
+<tr><td>動畫在部分瀏覽器不跑</td><td>SMIL 支援度差異（舊 Edge/IE 沒有）</td><td>接受降級（顯示靜態 frame）；或用 CSS keyframes 替代純 SMIL</td></tr>
+<tr><td>視覺配色刺眼</td><td>違反品牌色票（亮粉霓虹）</td><td>遵守「暗底 + 單一 emerald 強調色」約束；回歸到 <code>#4db18f</code> 家族</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>reveal() 的「亮起 → 保持 → 淡出」三階段。請設計一個「延長後半段停留時間」的變體（例如慢速快照模式），並說明 <code>kt()</code> 的 (keyTime, value) 對該怎麼重新分配。</li>
+<li>「SVG 是劇本、graph.html 是真相」的界線。如果要把 SVG 升級成「自動選路徑」（挑一條介數中心性最高的 path 當主角），需要哪些額外輸入？生成的 SVG 會失去什麼「可預期性」？</li>
+<li>SMIL 的 10 秒主週期對所有 animate 是硬約束。若你需要在同一份 SVG 裡加一個「永不淡出」的常亮元素，該怎麼在約束內表達？還是說這個需求本身暗示了約束該被放寬？</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

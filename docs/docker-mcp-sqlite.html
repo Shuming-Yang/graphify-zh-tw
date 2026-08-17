@@ -168,6 +168,64 @@ docker rmi mcp/sqlite:latest</code></pre>
 </div>
 <!-- End Tutorial Sections -->
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：用 SQLite MCP 當 graphify-out 的「即席分析」後端</h2>
+<p>前面的 runbook 把 SQLite 當獨立工作區；這次把兩者合起來：<strong>graph.json 建好後，用 SQLite MCP 對圖資料做 SQL 即席查詢</strong>——例如「哪個節點的 degree 最高」「某個社群有哪些節點」「哪些邊是 AMBIGUOUS 待人工檢視」。</p>
+<ol>
+<li><strong>匯出圖資料</strong>：<code>graphify export</code> 產出 <code>graphify-out/graph.json</code>（node-link 格式）。</li>
+<li><strong>建 SQLite schema</strong>：用 <code>docker mcp tools call create_table</code> 建立 <code>nodes</code>（id,label,file_type,community,degree）與 <code>edges</code>（source,target,relation,confidence）兩張表。</li>
+<li><strong>灌資料</strong>：寫個小 script 把 graph.json 攤平，用 <code>docker mcp tools call write_query</code>（或 sqlite3 CLI）批次插入。</li>
+<li><strong>即席分析</strong>：<code>read_query</code> 跑「SELECT … GROUP BY community ORDER BY COUNT(*) DESC」看社群大小分佈、或「SELECT * FROM edges WHERE confidence='AMBIGUOUS'」列待審邊。</li>
+<li><strong>接進 agent</strong>：<code>docker mcp client connect claude-code</code> 後，你的 agent 就能用 SQL 語言查知識圖譜，而不只是 <code>graphify query</code> 的固定介面。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：graphify 的查詢（query/path/explain）是「設計好的走訪」，但跨維度的資料分析（分佈、聚合、Join）是 SQL 的主場。把圖倒進 SQLite 讓你拿到第二個查詢語言，且不影響 graphify 本體；而 Docker named volume 確保存續——重啟容器後分析成果還在。這是一條「工具拼裝」的路徑，示範 MCP 生態怎麼補足單一工具的盲點。</div>
+
+<h2>② 深入原理擴充：MCP 生命周期、named volume 持久化、與「無狀態 vs 有狀態」的界線</h2>
+<p>這份 runbook 的技術核心其實是三個「生命周期」：</p>
+<ul>
+<li><strong>Gateway 生命周期</strong>：<code>docker mcp tools call</code> 每次開新的 ephemeral gateway（約 5 秒開銷），所以「沒看到新工具」多半是 session 用的 gateway 還停留在舊 profile——要 <code>mcp-activate-profile</code> 或開新 gateway。</li>
+<li><strong>容器生命周期</strong>：容器是無狀態的；狀態住在 named volume <code>mcp-sqlite</code>，mount 在 <code>/mcp</code>。<code>docker run --rm</code> 每次起新容器但 <code>-v mcp-sqlite:/mcp</code> 讓資料跨容器存活——這是「無狀態運算 + 有狀態儲存」的標準分隔。</li>
+<li><strong>MCP 工具的生命周期</strong>：工具只是 RPC 介面，SQLite 檔才是真相；<code>append_insight</code> 這類「寫 meta」的工具要跟 <code>write_query</code> 共用同一顆 DB 才有意義。</li>
+</ul>
+<p>SQLite 的儲存（單檔、無 server、transactional）在這裡恰到好處——不像 MySQL/PG 要管理 daemon，也不像純 JSON 沒有聚合能力。</p>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：很多人以為「<code>docker mcp tools call</code> 是連到一個常駐 server」。其實每次呼叫都起一個<strong>新的 ephemeral gateway</strong>，而 SQLite server 容器每次也重新拉起來。如果你用 <code>docker mcp tools call write_query</code> 寫入，卻換一個終端機/換 profile 再 <code>read_query</code>，讀到的可能是<strong>不同 gateway 開的另一份 DB 檔</strong>（或連到不同 volume）。正確做法是把 DB 路徑固定在 <code>/mcp/db.sqlite</code> 與同一 named volume——否則「明明寫了卻讀不到」就是這個陷阱。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td>寫入後立刻讀取讀不到資料</td><td>兩個呼叫用了不同 gateway / 不同 volume / 不同 DB 路徑</td><td>確認兩次呼叫都用 <code>-v mcp-sqlite:/mcp</code> 且 DB 路徑都是 <code>/mcp/db.sqlite</code></td></tr>
+<tr><td><code>docker mcp tools count</code> 沒增加</td><td>gateway 以 dynamic-tools 模式執行，profile 尚未啟動</td><td>執行 <code>docker mcp tools</code>（用預設 profile 開 ephemeral gateway）或呼叫 <code>mcp-activate-profile</code></td></tr>
+<tr><td><code>call: EOF</code> 或 handshake 失敗</td><td>server 容器缺 env、entrypoint binary 不存在（sqlite-mcp-server 的掛法）</td><td>直接 <code>docker run --rm -i -v mcp-sqlite:/mcp mcp/sqlite:latest --db-path /mcp/db.sqlite</code> 看錯誤</td></tr>
+<tr><td>volume 裡有多顆 DB 檔，資料「散落」</td><td>不同工具/不同路徑各開了自己的 .db</td><td><code>docker run --rm -v mcp-sqlite:/mcp:ro alpine ls -la /mcp</code> 檢查；統一 DB 路徑</td></tr>
+<tr><td>解除安裝後重裝，舊資料還在</td><td><code>docker mcp profile server remove</code> 不會刪 volume</td><td>手動 <code>docker volume rm mcp-sqlite</code>（不可逆，先確認不需要）</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>這份 runbook 用 Docker named volume 存 SQLite。如果改用 bind mount（<code>-v $HOME/data:/mcp</code>），持久化與備份的取捨會怎麼變？什麼場景下 bind mount 更好？</li>
+<li>把 graph.json 倒進 SQLite 後，<code>graphify query</code> 的「加權評分（IDF + trigram + 社群）」能在 SQL 裡重現嗎？如果可以，SQL 會多複雜；如果不可以，哪部分是 SQL 做不到的？</li>
+<li>MCP 工具暴露給 agent 的是固定 6 個 SQLite 操作。若要防止 agent 誤執行破壞性 SQL（如 <code>DROP TABLE</code>），你會在「MCP 工具層」還是「SQLite 層」做防護？設計一個最小防護方案。</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

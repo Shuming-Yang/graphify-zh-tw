@@ -141,6 +141,64 @@
 <div class="callout"><strong>看完這頁你應該能說出</strong>：LanguageConfig 是什麼、加一個語言要改哪裡、tsconfig alias 在 resolution.py 怎麼處理。配合 <a href="pipeline.html">pipeline</a> 的 <code>extract_python</code> 看，整條「設定 → 引擎 → 解析」就完整了。</div>
 </div>
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：為一個冷門語言加入完整支援</h2>
+<p>前面是「看懂 LanguageConfig + 引擎」；這次是<strong>真的加一種語言</strong>：你的公司有大量 Kotlin 舊 codebase，graphify 不支援 Kotlin，你要把它加進抽取支援並通過測試。</p>
+<ol>
+<li><strong>寫 LanguageConfig</strong>：對照 <code>models.py</code> 的 dataclass，定義 Kotlin 的 class/function/method 對應的 tree-sitter 節點型別、import 型別、特殊掛勾——能塞進設定就別動 engine。</li>
+<li><strong>處理語言特例</strong>：Kotlin 的 extension functions、data class、`import` 的 package 形式——檢查是否需要 <code>extra_walk</code> 掛勾（如 <code>_kotlin_extra_walk</code>），非必要的話先做最小版本。</li>
+<li><strong>註冊三處</strong>：<code>_DISPATCH</code>（extract.py 或 registry）、<code>CODE_EXTENSIONS</code>（detect.py）、<code>_WATCHED_EXTENSIONS</code>（watch.py）；pyproject 加 tree-sitter-kotlin。</li>
+<li><strong>加 fixture 與測試</strong>：<code>tests/fixtures/sample.kt</code> + <code>test_languages.py</code> 的測例——驗證 class/function/import 都抽得到，跨檔呼叫解析（Phase 2）也驗證一次。</li>
+<li><strong>驗證不破其他語言</strong>：<code>pytest tests/ -q</code> 全跑——fixtures 是 30+ 語言共用的，新增不能弄壞別人。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：「設定 + 通用引擎」的架構讓新語言通常只需「設定 + 掛勾 + 註冊 + 測試」——這是 0.3.0 重構（2527 → 1588 行）的紅利。但別誤會成「零成本」：跨檔解析（resolution.py 的 tsconfig/workspace/JS 路徑）是另一層深度，Kotlin 的 package 解析若不做，import 邊就停在檔案級。先做「能用的最小版」再補 resolution，是務實的貢獻順序。</div>
+
+<h2>② 深入原理擴充：dispatch 的歧義處理，與「無抽取器也是一種答案」</h2>
+<p>extractors 頁最容易被忽略的是「<strong>決定不抽也是一種決定</strong>」：</p>
+<ul>
+<li><strong>檔名優先於副檔名</strong>：<code>.blade.php</code> 要在查 <code>.php</code> 之前判斷；MCP config、套件 manifest 同理。</li>
+<li><strong>歧義副檔名靠內容 sniff</strong>：<code>.h</code> 可能是 C/C++/ObjC——用 <code>_is_objc_header</code>、<code>_is_cpp_header</code> 判斷；<code>.m</code> 可能是 Objective-C 或 MATLAB——只有真的像 ObjC 才走 ObjC，否則<strong>寧可無抽取器被警告</strong>，也不硬解析出錯節點。</li>
+<li><strong>無副檔名靠 shebang</strong>：<code>#!/usr/bin/env bash</code> 的 CLI 檔也是程式碼。</li>
+<li><strong>警告 vs 靜默</strong>：extract 對「零節點檔 / 無抽取器 / 缺相依套件」各印一種醒目警告——「一個檔默默消失」是最難除錯的資料問題，所以寧可吵。</li>
+</ul>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：以為「抽取器存在 = 這個語言的圖完整正確」。實際上每種語言的抽取深度<strong>不等</strong>：Python 有 rationale（docstring）節點、SQL 有表格/FK/JOIN 的確定性抽取、TS 有 tsconfig alias 解析——但 Bash 的 <code>source</code> 邊、Pascal 的 cross-file、Apex 的 regex 抽取都比較淺。最常見的誤判：看到 <code>extract_kotlin</code> 或任何新加的語言就以為「跨檔 calls 全通了」，其實該語言可能只做完「結構抽取」。判讀深度看 test_languages.py 有沒有該語言的 cross-file 測例，別看有沒有抽取器。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td>新語言節點都抽到了，但跨檔呼叫斷掉</td><td>只有結構抽取，沒做該語言的 import/resolution 解析</td><td>補 <code>_import_&lt;lang&gt;</code> 與 resolution 支援；先確認 Phase 2 是否涵蓋該語言</td></tr>
+<tr><td><code>.h</code> 檔被抽錯語言</td><td>內容 sniff 誤判（C++ header 被當 C）</td><td>檢查 <code>_is_cpp_header</code> 的判據；調整或改為保守（寧可警告）</td></tr>
+<tr><td>`import { Foo } from "@/lib"` 解不開</td><td>tsconfig alias 沒被讀到（baseUrl/paths 設定位置不同）</td><td>確認 <code>_read_tsconfig_aliases</code> 有讀到該 tsconfig；檢查 resolve 的根目錄</td></tr>
+<tr><td>新語言要裝的 grammar 裝了卻 ImportError</td><td>pyproject 只加了 dependency 但沒加 optional extra 對映</td><td>確認 extra（如 <code>[sql]</code>）與 import 路徑一致；<code>pip install "graphify[&lt;lang&gt;]"</code></td></tr>
+<tr><td>加語言後別的語言測試爆炸</td><td>registry 全域註冊污染、或 fixture 命名撞檔（如 sample.f90 vs .F90）</td><td>跑 <code>pytest tests/ -q</code> 對比爆炸範圍；檢查 registry 是否有共享可變狀態</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>「無抽取器寧可警告也不硬解析」的原則（.m 檔）犧牲了「能抽到一點」。請設計一個決策規則：什麼情況下「partial extraction（抽出確定無誤的部分）」優於「零抽取 + 警告」？</li>
+<li>LanguageConfig 想把語言差異全部參數化。請找出至少兩個「無法被參數化、必須靠 engine 新 code」的語言特性（例如 C# partial class 合併），並解釋為何無法表達成設定。</li>
+<li>resolution.py 目前支援 tsconfig/workspace/JS 路徑。請評估是否該把「Python 的 <code>__init__.py</code> 重新匯出、Go 的 module 路徑」也納入 resolution——納入的話，Phase 2 的跨檔邊會變多還是變準？各自的風險是什麼？</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

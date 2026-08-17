@@ -167,6 +167,63 @@
 <div class="callout"><strong>看完這頁你應該能說出</strong>：god nodes 排除哪些節點、surprising connections 怎麼依語料規模分流、GRAPH_REPORT.md 有哪些章節、哪一章節只有含 code 的圖才輸出。接著讀 <a href="export.html">export + exporters</a> 看「圖怎麼變成 graph.html 和其他檔案」。</div>
 </div>
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：用 graph_diff 做 PR 影響分析</h2>
+<p>前面是「理解 god nodes 怎麼算」；這次是<strong>把 analyze 變成決策工具</strong>：你的團隊要在 <code>dedup.py</code> 重構前，先回答「這會影響哪些社群、哪些跨檔邊」。</p>
+<ol>
+<li><strong>建「before」圖</strong>：在目前 HEAD 跑 <code>graphify extract .</code>，存一份 <code>graph-before.json</code>（含 <code>built_at_commit</code>）。</li>
+<li><strong>改分支、建「after」圖</strong>：在 feature branch 跑 <code>graphify update .</code> 增量建圖，存 <code>graph-after.json</code>。</li>
+<li><strong>算差異</strong>：用 <code>graph_diff(G_old, G_new)</code> 或對應 CLI——得到新增/移除的節點與邊（以 (u,v,relation) 為 key 的集合差）。</li>
+<li><strong>解讀影響</strong>：新增邊指向的社群 = 受影響的模組；被移除的邊 = 已刪的依賴。把「受影響社群」對照 GRAPH_REPORT 的社群清單，寫成 PR 描述。</li>
+<li><strong>判斷風險</strong>：如果改的是「跨檔案 hub 節點」，連帶的社群數會很多——標記為高風險；如果只在單社群內，低風險。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：grep 只能看到「這個檔改了」，<code>graph_diff</code> 看到的是「這條依賴斷了、這個社群被波及」——結構層的影響是文字 diff 看不見的。而且它與報告的「稽核性質」一致：每個「影響」都可回溯到具體的節點/邊，不是 LLM 的推測。</div>
+
+<h2>② 深入原理擴充：surprising connections 的兩種策略，與 god nodes 的排除清單</h2>
+<p>analyze 頁兩個函數最值得深挖：</p>
+<ul>
+<li><strong>surprising_connections 依語料規模分流</strong>：多檔語料走「跨檔實體之間的邊」並排序 AMBIGUOUS → INFERRED → EXTRACTED（越不確定越值得看）；單檔/單源語料走「跨社群的橋樑邊」（用邊介數中心性），揭露非顯而易見的結構耦合。同一個「驚喜」概念，兩套定義。</li>
+<li><strong>god_nodes 的排除清單是歷史累積</strong>：檔案節點、概念節點、JSON key 節點、<code>_BUILTIN_NOISE_LABELS</code>（<code>str</code>/<code>int</code>/<code>MagicMock</code>…）——最後一項是 0.8.33 修掉的真實 bug：內建型別灌爆度數、把真抽象擠出排名。這說明「找核心抽象」的問題定義（什麼算雜訊）比演算法（sort by degree）難得多。</li>
+<li><strong>report 的章節是「有條件輸出」</strong>：Import Cycles 只在圖含 code 時輸出，否則純噪音；<code>--obsidian</code> 才輸出 wikilink 的 Community Hubs，避免預設報告一堆斷鏈。報告會「知道什麼時候該閉嘴」。</li>
+</ul>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：以為「god node = 架構上最重要的抽象」。度數只代表「被連最多」，不代表「最重要的入口」——<code>errors.py</code> 的 exception 類別可能度數很高（人人 import），但它是協議細節不是核心流程。更隱晦的：<strong>degree 是無向的</strong>，把 <code>calls</code> 的方向資訊丟了；一個「被 50 個檔呼叫」的 util 與「呼叫 50 個函數的 orchestrator」度數相同，但架構意義完全不同。讀 god nodes 時要回到有向圖查 direction。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td>god nodes 出現預期外的工具類/設定類節點</td><td>排除清單沒覆蓋（新語言型別、設定 key 未被視為 JSON key 節點）</td><td>檢查 <code>_BUILTIN_NOISE_LABELS</code> 與 <code>_is_concept_node</code>/<code>_is_json_key_node</code> 的判定</td></tr>
+<tr><td>surprising connections 全是不重要的邊</td><td>多檔語料下「跨檔實體邊」太多，排序被 AMBIGUOUS 灌滿</td><td>調整 <code>top_n</code>；對照單檔語料改用跨社群橋樑策略</td></tr>
+<tr><td><code>graph_diff</code> 回報大量假性新增/移除</td><td>節點 ID 不穩定（hash 型 ID 或順序依賴）導致同節點被算成不同</td><td>確認 ID 用穩定規範（<code>{parent_dir}_{stem}</code>）；排除順序差異造成的噪音</td></tr>
+<tr><td>報告出現「沒有 import 的 Import Cycles」</td><td>文件語料仍輸出了 code 專屬章節</td><td>確認 <code>report.py</code> 的「圖裡有沒有 code」檢查有生效（升級版本）</td></tr>
+<tr><td>建議問題（suggested questions）問不到重點</td><td>問題由結構啟發（AMBIGUOUS 邊、橋樑節點），不是語意啟發</td><td>把它當「結構提議」而非「領域問題」；用 path/explain 人工補足語意深度</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>「god node 的 degree 是無向的」——請設計一個「有向 god node」指標（考慮出度/入度分離），並預測它會讓哪類節點浮出水面、哪類沉下去。</li>
+<li>surprising connections 排序 AMBIGUOUS 優先。請提出一個反例：某條 EXTRACTED 邊其實比 AMBIGUOUS 邊更值得報告（提示：考慮邊的跨社群性質），並說明你的排序規則。</li>
+<li>report 說「每一段都由圖資料計算」。請找一段看似「計算」、其實是「啟發式」的章節（例如 Knowledge Gaps 的孤獨節點判斷），並討論這種啟發式誤判的後果與改善方向。</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

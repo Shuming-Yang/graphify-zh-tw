@@ -188,6 +188,58 @@ python crosstool/run.py --repo erpnext --max-spend &lt;budget&gt;</code></pre>
 </div>
 <!-- End Tutorial Sections -->
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：用 graphify 當自家文件的記憶層並量化成效</h2>
+<p>這次不是重現上游基準，而是<strong>為你自己的語料設計一次基準</strong>：你的團隊有一個 800 份 markdown + 60 個 Python 模組的內部知識庫，你被問「換成 graphify 當記憶層值不值得」。</p>
+<ol>
+<li><strong>建圖</strong>：<code>graphify extract corpus/</code>——markdown 走 Pass 3（花 token），Python 走 AST（免費）；記下 spend ledger 與 nodes/edges/社群數。</li>
+<li><strong>定義評分集</strong>：請領域專家挑 50 個「查詢 + 必須涵蓋的原子事實」當 ground truth（模仿 LOCOMO 的 key-fact coverage 精神）。</li>
+<li><strong>建基線</strong>：用相同語料跑 BM25（<code>graphify benchmark</code> 或本地 script），得到「無圖」的 recall 對照。</li>
+<li><strong>測圖檢索</strong>：用 <code>graphify query</code>（graph-expand）對同一組 50 題取 recall@10，再用固定的 reader 模型答題。</li>
+<li><strong>量成本</strong>：對照 ingest 的 USD（<code>graphify extract</code> 的 token 統計）與搜尋的 token 用量，畫出「準確度/成本」座標。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：基準的價值在「<strong>在你的語料上</strong>」——LOCOMO 的 0.497 是他人語料的數字，你的分佈（中英混雜、有程式碼有文件）可能完全不同。自建 harness 的好處是：共享 reader 與裁判、寫 spend ledger、連 gemini 的召回都只跟你的語料有關。這正是「self-reported 數字只能當起點」的意義。</div>
+
+<h2>② 深入原理擴充：graph-expand 與 SurrealDB engine 的差異、以及「公平」怎麼被破壞</h2>
+<p>表裡出現兩個 graphify 引擎：<strong>graph-expand</strong>（預設，檢索時沿圖展開候選）與 <strong>SurrealDB engine</strong>（把圖倒進資料庫查）。兩者共用同一張 AST 圖、同一 embedder，差別在檢索策略——graph-expand 用圖結構把 seed 節點沿邊展開補召回，SurrealDB 版則靠資料庫索引做近鄰。LOCOMO 上 graph-expand 略勝（0.497 vs 0.485）。<strong>公平的脆弱點</strong>則藏在「共用 embedder」這條規則：supermemory 用自家 768-d 純英文 embedder，recall 被綁死（0.149）；一旦有人偷偷換成對語料更好的 embedder，數字就不可比。所以讀基準要先問「<em>哪一層共用</em>」——模型、embedder、裁判、預算，四層共用才叫公平。</p>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：表頭的「建圖零 LLM 成本 $0」常被解讀成「整個流程零成本」。實際上<strong>只有 AST 建圖是零 LLM</strong>；如果你的語料含文件/論文/圖片（Pass 3），那些檔案仍要花 token。LOCOMO 的 $1.40 是「記憶 ingest」成本，其中就含語意抽取的文件部分。引用「$0 建圖」時務必標注語料類型——純程式碼才成立。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td>自己語料上 recall 遠低於表上的 0.497</td><td>語料分佈不同（多語言、文件比重高）或評分集太難</td><td>先確認 embedder（BGE-m3）有裝且被用到；對照純 BM25 基線看相對增益而非絕對值</td></tr>
+<tr><td>重跑基準數字對不上</td><td>token 預算（<code>--max-spend</code>）不同、reader/裁判模型換了、資料集版本不同</td><td>固定 <code>MOONSHOT_API_KEY</code> 對應的模型、固定 <code>--n</code> 與 seed、每次跑寫 spend ledger</td></tr>
+<tr><td>supermemory/mem0 adapter 連不上</td><td>adapter 需要 self-hosted 服務或額外 embedder 下載</td><td>看 harness 文件裝好 adapter 前置；確認共用 BGE-m3 而非 adapter 自帶 embedder</td></tr>
+<tr><td>裁判分數忽高忽低</td><td>裁判 prompt 被改動或模型 provider 路由不一致</td><td>跑盲驗（第二裁判一致性 &gt; 90%）確認；固定裁判版本與温度</td></tr>
+<tr><td><code>spend ledger</code> 金額異常</td><td>重試機制、快取沒生效或并行 worker 暴衝</td><td>調低 <code>--workers</code>；確認 semantic cache 命中；檢查每 run 的 input/output token 分項</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>coverage 公式 <code>(covered + 0.5 * partial) / total</code> 的 0.5 是「部分涵蓋折半」。如果改成 0 或 1，哪些系統的排名會翻轉？這說明了「評分機制的微小參數會改寫基準結論」——你如何避免自己被誤導？</li>
+<li>harness 讓 mem0/supermemory「當 adapter 塞進同一條流水線」。要做到「真正的公平」，你認為哪一項最難保證：同模型、同 embedder、同預算、還是同裁判？為什麼？</li>
+<li>ERPNext 案例用「圖工具 + 固定代理」把關鍵事實覆蓋率從 70.8% 拉到 82.0%。請設計一個消融實驗，證明這 11.2 分的提升是「圖」造成的，而不是「工具多了個介面」造成的。</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

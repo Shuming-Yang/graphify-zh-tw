@@ -126,6 +126,63 @@
 </div>
 <!-- End Tutorial Sections -->
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：為「允許 ingest 的團隊入口」建立受控環境</h2>
+<p>前面的 Worked Example 是逐一測試驗證函數；這次是<strong>部署情境</strong>：你們要把 graphify 裝在共享工作站，讓 5 個工程師都能 <code>graphify add</code> 抓網頁/論文進知識庫，但要求「預設安全、可稽核」。</p>
+<ol>
+<li><strong>固定安裝與路徑</strong>：graphify-out 統一放共享 volume；<code>GRAPHIFY_OUT</code> 指向它；確認 MCP 只以 stdio transport 啟動（不開 <code>--transport http</code>，避免任何網路監聽）。</li>
+<li><strong>先測 SSRF 防護</strong>：在 CI 加一組 security smoke test——<code>validate_url("http://169.254.169.254/latest/meta-data")</code>、<code>validate_url("http://127.0.0.1:8080")</code>、<code>validate_url("file:///etc/passwd")</code> 都應拋錯（防雲端 metadata 與內網掃描）。</li>
+<li><strong>驗證路徑界線</strong>：<code>validate_graph_path("../../etc/passwd", base)</code> 應被拒絕；確認 serve 只讀 <code>graphify-out/</code> 內的圖。</li>
+<li><strong>審查抽取內容</strong>：跑 <code>graphify extract</code> 後檢視 GRAPH_REPORT 的 AMBIGUOUS 邊與 label——確認沒有來自未知來源的可疑節點（刻意資料注入測試）。</li>
+<li><strong>建立漏洞通報流程</strong>：把 SECURITY.md 的「private vulnerability reporting、48h 回覆」貼進團隊章程，規定不開公開 issue。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：團隊共享環境的安全問題不是「單一漏洞」，而是「<strong>預設邊界 + 可驗證 + 通報管道</strong>」三件套。stdio-only、URL 白名單、路徑強制、內容審查，每一件都能用一行測試驗證——這讓安全不只是宣稱，而是 CI 可稽核的事實。</div>
+
+<h2>② 深入原理擴充：SSRF 的兩道防線、與 prompt injection 的「table-stakes」哲學</h2>
+<p>安全頁最容易被低估的是「一層驗證不夠」：</p>
+<ul>
+<li><strong>validate_url 是第一道（入口）</strong>：scheme 白名單 + 擋 metadata host + DNS 解析後逐 IP 檢查私有/保留網段。</li>
+<li><strong>_SSRFGuardedHTTP(S)Connection 是第二道（連線時）</strong>：不 monkey-patch 全域 <code>getaddrinfo</code>（併發下是 TOCTOU 隱患），而是子類別化 connection——<strong>每個連線只解析一次 DNS、驗證結果、連到那個精確 IP</strong>。這擋住 DNS-rebind：攻擊者先回傳公開 IP 通過驗證，再換成內網 IP——因為沒有第二次解析，換 IP 的視窗被關掉。</li>
+<li><strong>Prompt injection 是「table-stakes」</strong>：語意 pass 的原始檔是攻擊者可控文字。防護是 <code>&lt;untrusted_source path=… sha256=…&gt;</code> 雜湊戳記 + 系統提示「當惰性資料」+ <code>_neutralise_injection_sentinels()</code> 解除 <code>&lt;|im_start|&gt;</code>、<code>[INST]</code> 等 jailbreak 記號。文件明講：這不是讓 injection 不可能，是讓它「從第一次就成功變成需要繞過」。</li>
+</ul>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：以為「<code>sanitize_label()</code> 有 HTML-escape，所以 graph.html 一定安全」。escape 只保護<strong>被嵌入 innerHTML 的 label/title 字串</strong>；如果哪個 exporter 把 label 塞進 <code>src</code>、<code>href</code> 或 URL 參數（沒有對應的 URL-escape），或某個屬性忘了走 <code>esc()</code>，XSS 仍可能發生。同理，「<code>safe_fetch</code> 擋 50MB」不保證下游處理安全——記憶體放大、zip bomb 都還可能。安全是「每一層都對」，不是「有一個 sanitizer 就夠」。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td><code>ingest</code> 抓正常網站卻被擋</td><td>網站 DNS 解析出 CDN 的內網 IP、或用 IP 直連的私有位址</td><td>確認不是私有網段；若是合法服務，評估風險後加到允許清單並記錄理由</td></tr>
+<tr><td>圖 HTML 出現「彈跳視窗/腳本執行」</td><td>某條 label 路徑沒走 HTML-escape</td><td>追 exporter 的 <code>esc()</code> 覆蓋；測 <code>&lt;img src=x onerror=…&gt;</code> 作為 label 跑 export</td></tr>
+<tr><td>語意抽取把檔內容當成指令執行</td><td>injection sentinel 沒被解除（自訂 prompt 移除了 <code>_neutralise_injection_sentinels</code>）</td><td>確認抽取 prompt 保留 sentinel 清理；檢查 <code>&lt;untrusted_source&gt;</code> 包覆是否完整</td></tr>
+<tr><td>MCP server 讀到圖外的檔案</td><td>client 傳了絕對路徑且 <code>validate_graph_path</code> 被繞過</td><td>確認所有 server 工具都走 <code>validate_graph_path</code>；不要直接 join 使用者輸入</td></tr>
+<tr><td>非 UTF-8 來源檔讓抽取中斷</td><td>tree-sitter byte slice 沒用 <code>errors="replace"</code> 解碼</td><td>確認走標準 decode 路徑；自行包 decode 時加 <code>errors="replace"</code></td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>DNS-rebind 防禦靠「連線時只解析一次」。請畫出攻擊時序（validate → DNS1 → connect → DNS2 換 IP）並指出 `_SSRFGuardedHTTPConnection` 在哪一步切斷了攻擊。</li>
+<li>「table-stakes」的意思是防禦只能提高攻擊成本。請設計一個「第二層」防禦：如果注入文字成功混進抽取 prompt，你如何在<em>結果端</em>偵測「這條邊可能是注入產物」？</li>
+<li>「<code>--transport http</code> 是 opt-in 並綁 127.0.0.1」。若要開放給同網段其他機器使用（<code>--host 0.0.0.0</code>），你需要補上哪些控制項才能在安全模型文檔裡自圓其說？</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

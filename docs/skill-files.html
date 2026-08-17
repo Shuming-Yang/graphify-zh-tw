@@ -168,6 +168,63 @@ corpus size. Do not ask the user to narrow. The graph is already built — use i
 </div>
 <!-- End Tutorial Sections -->
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：fork 一份 graphify 並客製化自家 skill 的完整循環</h2>
+<p>前面的 Worked Example 是「追蹤產出流程」；這次是<strong>真的動手客製</strong>：你的公司要把 graphify 調成「只支援特定語言 + 中文 report + 自家 MCP 後端」，正確的改法是從 fragments 下手。</p>
+<ol>
+<li><strong>fork 與環境</strong>：clone 上游、裝依賴、確認 <code>python -m tools.skillgen --check</code> 在乾淨狀態 exit 0（baseline 一致）。</li>
+<li><strong>改 fragments</strong>：編輯 <code>tools/skillgen/fragments/</code> 下的對應片段（例如在 core 的 Step 3 加「只抽取下列語言的清單」、把 report 範本改中文）——<strong>不要碰已產生的 SKILL.md</strong>。</li>
+<li><strong>重新產生</strong>：<code>python -m tools.skillgen</code> 重渲染所有平台；再用 <code>--audit-coverage</code> 驗證你改的 host 每個 heading 仍「單一居住」在它的渲染裡。</li>
+<li><strong>更新 baseline</strong>：<code>python -m tools.skillgen --bless</code> 寫進 expected/，再 commit fragments + 產物 + baseline 三者。</li>
+<li><strong>安裝驗證</strong>：<code>graphify install --platform opencode</code> 裝到 <code>~/.config/opencode/skills/graphify/</code>，實測 <code>/graphify</code> 觸發後行為符合預期。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：skill 檔是 <em>generated artifact</em>，直接改 SKILL.md 會讓 byte-diff 檢查抓狂、且下次 <code>python -m tools.skillgen</code> 就把你的修改洗掉。從 fragments 改，你的客製才有「來源（fragments）→ 產物（SKILL.md）→ 驗證（check/audit）→ 安裝」的完整閉環，也能跟著上游 upgrade 而不衝突。</div>
+
+<h2>② 深入原理擴充：description 是「觸發器」，always-on 機制才是「保命符」</h2>
+<p>技能檔最容易被人低估的是「<strong>什麼時候會被載入</strong>」：</p>
+<ul>
+<li><strong>description 決定「何時被想起」</strong>：frontmatter 的 description 是 skill 的名片——assistant 看到問題會先比對 description 再決定要不要載入。所以 Graphify 刻意把 description 寫得很寬（「任何 codebase 問題都可能觸發」）。<code>platforms.toml</code> 規定它「PRESERVED VERBATIM per platform」——改一個平台就全部同步，避免觸發率不一致。</li>
+<li><strong>always-on 機制決定「何時被迫看」</strong>：光靠 description 不夠——agent 可能忘了。所以各平台有「常駐」機制：OpenCode 用 AGENTS.md + <code>tool.execute.before</code> plugin、Claude Code 用 CLAUDE.md + PreToolUse hook、Cursor 用 alwaysApply 的 <code>.mdc</code>。Codex 的 hook 是刻意 no-op，只靠 AGENTS.md。</li>
+<li><strong>Fast path 是「省錢的入口」</strong>：graph.json 存在 + 自然語言問題 → 跳過建圖直接 query，連 detect 都不跑。</li>
+</ul>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：以為「裝好 skill 就等於接好 hook」。安裝（把檔案放對位置）與「啟用 always-on」是兩回事：例如 OpenCode 的 <code>tool.execute.before</code> plugin 要另行配置、Cursor 的 <code>.mdc</code> 要在 rules 設定 alwaysApply——缺了其中一環，skill 檔案都在，但 agent 不會在該觸發時載入，只在你手動輸入 <code>/graphify</code> 時才跑。檢查「skill 有沒有真的常駐」的最快方法：直接問 agent 一個 codebase 問題，看它是否自動先讀圖。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td>助手對 codebase 問題不自動用 graphify</td><td>always-on 機制沒啟用（hook 未裝、plugin 沒設）</td><td>照 platform 對照表補上 hook/AGENTS.md/.mdc；用「問問題看是否自動讀圖」驗證</td></tr>
+<tr><td><code>skillgen --check</code> 一直 exit 1</td><td>有人直接改了 SKILL.md 或 fragment 改了沒重產</td><td>執行 <code>python -m tools.skillgen</code> 重產；確認之後 <code>--check</code> 過</td></tr>
+<tr><td>換機後 skill 不見</td><td>裝在 user scope（<code>~/.config/opencode</code>）且未備份 / 專案 scope 沒進 repo</td><td>決定 scope（user vs project）並把 project scope 的 skill 檔 commit；user scope 用安裝 script 重裝</td></tr>
+<tr><td>skill 版本比套件新、安裝被拒絕</td><td>skill 已更新而 pip 套件停在舊版（issue #1568）</td><td>升級套件而非降級 skill——<code>pip install -U graphify</code></td></tr>
+<tr><td>references 側車載入失敗</td><td>references/ 目錄遺失或部分檔案缺失</td><td>重新 <code>graphify install</code> 或從 repo 複製；確認 query.md（13KB）等大檔完整</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>description 要「寬到觸發、窄到不誤觸」。給你一個專案：只處理「Java + SQL 的 legacy codebase」的 graphify，你會怎麼改 description 讓它在該觸發時觸發、在不相干問題上不誤觸？</li>
+<li>Codex 平台的 hook 是「刻意 no-op」。請推測這個決策的理由，並設計一個不靠 hook、純靠 AGENTS.md 達成「先讀圖再回答」的方案。</li>
+<li>「Fast path」規定「不要 check corpus size、不要問使用者縮小範圍」。這條規則在什麼情況下會害你？如果要加一個例外條件，你會加在哪個判斷節點？</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

@@ -403,6 +403,64 @@
 </div>
 <!-- End Tutorial Sections -->
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：debug「某些語言抽不出節點」</h2>
+<p>前面的 Worked Example 看 pipeline 中間產物；這次是<strong>真實 debug 劇本</strong>：你的專案有 Python + TypeScript + Rust，跑完 <code>graphify extract .</code> 後 GRAPH_REPORT 顯示 Rust 檔案「零節點、零邊」。</p>
+<ol>
+<li><strong>先確認 detect 分類</strong>：<code>graphify detect .</code> 看 <code>.graphify_detect.json</code>——Rust 的 <code>.rs</code> 是否被歸類為 CODE？（可能是副檔名沒註冊進 <code>CODE_EXTENSIONS</code>）。</li>
+<li><strong>確認 dispatch</strong>：檢查 <code>_get_extractor(path)</code> 對 <code>.rs</code> 是否回傳非 None；確認 <code>_DISPATCH</code> 表有 <code>rust</code> 且 tree-sitter-rust 有安裝。</li>
+<li><strong>看警告輸出</strong>：<code>graphify extract . --verbose</code>——extract 對「零節點檔 / 無抽取器 / 缺相依套件」會各印一種醒目標記（issue #1666/#1689/#1745），錯誤訊息通常直接告訴你答案。</li>
+<li><strong>試單檔</strong>：拿一個 fixture Rust 檔（tests/fixtures/sample.rs）單獨跑，對照 test_languages.py 的預期節點數——若 fixture 正常、你的檔不行，就是「語法太新/太怪」。</li>
+<li><strong>補測試後再修</strong>：把這個案例加進 fixtures + test_languages.py，確認修復被鎖住，避免回歸。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：「零節點」是 pipeline 最容易默默發生的資料問題——如果只用「輸出看起來對」當驗收，某個語言整批消失也不會被發現。這條路徑教的是「<strong>沿資料流逐站檢查</strong>」：detect 分類 → dispatch → 抽取 → 比對 fixture——每一站都有可印出的中間產物，把「猜測」變成「定位」。</div>
+
+<h2>② 深入原理擴充：cluster 的「演算法 20 行、工程 200 行」</h2>
+<p>這頁最容易被忽略的是 cluster.py 那些「圍繞演算法的工程」——它們才是社群結果可用的原因：</p>
+<ul>
+<li><strong>確定性</strong>：節點/邊排序重組 + <code>random_seed=42</code> + <code>trials=1</code>；社群依大小降序重編號，等大小用 <code>tuple(sorted(nodes))</code> 當 tiebreak（issue #1090）——否則等大小的社群 ID 每次跑都會亂跳，產生偽「社群 churn」。</li>
+<li><strong>hub 排除</strong>：度數超過百分位的超集線器先踢出，依鄰居社群多數決掛回——不然一個「連到全部」的 hub 會把無關子系統拉進同一群。</li>
+<li><strong>isolate 與拆分</strong>：0 度節點自成一群；過大社群（&gt;25% 且 ≥10）在子圖重跑 <code>_partition</code>；doc-hub 造成的低凝聚力社群（cohesion &lt; 0.05 且 ≥50）再拆一次。</li>
+<li><strong>相容性</strong>：Leiden/Louvain 都用 <code>inspect.signature</code> 動態傳參（不同套件版本參數名不同）；graspologic 的 ANSI 進度條被導到 devnull（Windows PowerShell 會毀 scroll buffer，issue #19）。</li>
+</ul>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：以為「Leiden 是隨機的，所以社群結果不可重現」。其實 graphify 花了大量工程讓它<strong>可重現</strong>——固定 seed、排序、穩定 ID。但真正的陷阱是：<strong>「社群穩定」不代表「社群正確」</strong>。stable 只保證「同一輸入 → 同一輸出」；如果輸入的邊就是錯的（例如跨檔解析漏接），你會得到一個「可重現但結構錯誤」的分群。判讀社群前，先確認邊的品質（EXTRACTED/INFERRED 比例），再信分群。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td>某語言整批零節點</td><td>副檔名未註冊 / dispatch 缺項 / tree-sitter grammar 沒裝</td><td>逐站查 detect→dispatch→抽取；用 <code>--verbose</code> 看警告類型</td></tr>
+<tr><td>同一次跑內社群數不穩定（重跑就變）</td><td>輸入順序被 dict 順序影響，或隨機種子沒固定</td><td>確認走排序重組的 stable 圖；確認 seed=42；不要手動改節點順序</td></tr>
+<tr><td>整個 repo 幾乎一個大社群</td><td>檔案級 hub / doc-hub 把所有節點拉在一起</td><td>檢查 <code>exclude_hubs_percentile</code>；看凝聚力分數，低凝聚力大社群會被再拆</td></tr>
+<tr><td>分群結果每次跑編號不同</td><td>社群 ID 穩定化沒生效（舊版 bug）或等大小社群 tiebreak 衝突</td><td>升級到含 issue #1090 修復的版本；比成員集合而非編號</td></tr>
+<tr><td>build 階段 ghost 節點（同節點兩份）</td><td>AST 與 semantic 抽取的 ID 慣例不一致（<code>_file_node_id</code> 規則沒對齊）</td><td>確認語意子代理遵循 <code>{parent_dir}_{stem}</code> 慣例；檢查 <code>_semantic_id_remap</code> 是否被繞過</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>「確定性」與「分群品質」可能衝突——固定 seed 可能鎖住一個次佳解。請設計一個實驗，比較「固定 seed 一次」與「多 seed 取眾數」在社群品質（以凝聚力衡量）上的差異，並討論確定性值不值得那個代價。</li>
+<li>cluster 排除 hub 用「度數百分位」。請指出這個規則在「星型圖」與「均質圖」上的失敗模式，並提出一個比「百分位」更好的 hub 判據。</li>
+<li>跨檔解析（Phase 2）依賴 resolution 支援。若某語言無 resolution，其 import 邊停留在檔案級。請提出「偵測這種降級」的啟發式，並設計它在報告中該怎麼呈現（而非默默輸出錯誤圖）。</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

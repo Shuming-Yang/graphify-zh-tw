@@ -220,6 +220,64 @@ Hyperedges (group relationships connecting 3+ nodes) live in G.graph["hyperedges
 </div>
 <!-- End Tutorial Sections -->
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：對 15 年歷史程式庫做「架構考古」</h2>
+<p>前面的 Worked Example 比較兩份語料的抽取差異；這次是<strong>同一份程式庫、時間軸上的差異</strong>：你要分析一個跑了 15 年的 ERP 系統（如 benchmarks 頁的 ERPNext 場景），回答「核心抽象這 15 年怎麼演化」。</p>
+<ol>
+<li><strong>多 checkpoint 建圖</strong>：對每週/每季的 checkout 各跑一次 <code>graphify extract .</code>（AST-only，零 LLM），產生多份 <code>graph.json</code>——15 年 × 52 週 = 780 份。</li>
+<li><strong>逐版分析</strong>：每份圖跑 <code>graphify report</code> 取 god nodes（<code>Client</code>、<code>Request</code> 這類核心抽象）與社群數。</li>
+<li><strong>跨版比較</strong>：用 <code>graphify diff old-graph.json new-graph.json</code>（<code>graph_diff</code> 的 CLI）看節點/邊的增減——「2020 年多了 payment 社群、2023 年 gateway 社群大漲」。</li>
+<li><strong>規模 vs 結構分開看</strong>：對照節點成長（7×）與邊成長（17×）——邊漲得比節點快，代表<strong>耦合度上升</strong>，這是純詞彙檢索看不到的訊號。</li>
+<li><strong>產出報告</strong>：把「關鍵里程碑 + god node 變遷」寫成架構演化 memo，進新人的 onboarding 文件。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：歷史性問題需要「可重現、可比較」的圖——AST-only 建圖零成本、確定性，讓 780 次建圖完全自動化；而 <code>graph_diff</code> 給的是「結構層的差異」，補足 git log 只有文字 diff 的盲點。這是把 graphify 從「單次快照工具」升級成「長期演進儀表板」的用法。</div>
+
+<h2>② 深入原理擴充：Leiden 社群偵測到底做了什麼、以及確定性從哪來</h2>
+<p>文裡說「Leiden 依邊密度分群」，但實作上「把社群偵測弄到可用」的是圍繞它的工程：</p>
+<ul>
+<li><strong>演算法</strong>：graspologic 的 <code>leiden()</code>（比 Louvain 多了 refinement phase，社群更凝聚）；缺套件時退回 networkx Louvain。</li>
+<li><strong>確定性</strong>：分群前先把節點/邊<strong>排序後重組</strong>成 stable 圖、固定 <code>random_seed=42</code>、<code>trials=1</code>——否則同樣的圖每次跑社群編號會亂跳。</li>
+<li><strong>實用化</strong>：hub 排除（超集線器不參與分群，避免把無關子系統拉進同群）、isolate 自成一群、過大社群（&gt;25% 節點）與低凝聚力社群（&lt;0.05 且 ≥50 節點）再拆分、社群依大小重新編號穩定 ID。</li>
+<li><strong>不需要 embedding 的真正含義</strong>：相似度訊號由 <code>semantically_similar_to</code> 邊承載（Claude 抽取），圖結構本身就是相似度——沒有向量資料庫，也無法做 cosine 檢索。社群形狀 = 「邊密度」，不是「向量距離」。</li>
+</ul>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：「不需要 embedding」常被誤解成「語意相似性偵測完全靠 LLM、與圖無關」。實際上<strong>社群形狀會被抽取品質綁定</strong>：如果語意子代理漏抽 <code>semantically_similar_to</code> 邊，或抽取的 relation 標錯，社群就會歪掉——而且歪得很自然，看不出來。最常見的案例是「兩個 repo 的 <code>Block</code> class 被分進不同社群」：這不是 bug，是「該邊的抽取沒成功或 confidence 太低」的結果。看到奇怪的社群分界，先查邊，再質疑演算法。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td>同一個 repo 重跑兩次，社群成員變了</td><td>分群輸入不確定（節點順序被 dict 順序影響）或隨機種子被改</td><td>確認走的 <code>_partition</code> 有排序重組 + seed 固定；不要手動改 <code>G.nodes()</code> 順序</td></tr>
+<tr><td>整個 repo 幾乎一個大社群</td><td>檔案級 hub（如 CLAUDE.md 連到全部）把大家拉在一起</td><td>檢查是否有 doc-hub 節點；用 <code>exclude_hubs_percentile</code> 排除超集線器</td></tr>
+<tr><td>社群數比上次少很多</td><td>抽取失敗導致邊變少（語意子代理超時、文件缺）</td><td>看 GRAPH_REPORT 的 EXTRACTED/INFERRED 比例；對比 token 統計，找出哪類檔案沒抽到</td></tr>
+<tr><td>token 成本異常高</td><td>Pass 3 把不該送 LLM 的檔送出去（分類錯：如 <code>.apm.yml</code> 被當文件）</td><td>檢查 <code>classify_file</code> 結果；套件 manifest 應被導向 CODE</td></tr>
+<tr><td>社群命名讀起來很怪</td><td>用了預設命名（最高度數成員），沒跑 LLM 命名</td><td>設定 LLM 後端跑 Step 5；或接受「預設名 = 結構真相」並手動覆寫</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>圖的文宣宣稱「不需要 embedding、沒有向量資料庫」。請設計一個實驗證明這個宣稱的邊界——是否存在「圖檢索一定輸給向量檢索」的查詢類型？</li>
+<li>Leiden 的 resolution 參數控制「傾向細分還是不分」。解釋調整 resolution 對「過大社群拆分」步驟的交互影響。</li>
+<li>「邊漲得比節點快（17× vs 7×）」被解讀為耦合度上升。這個解讀忽略了哪個混淆因子（confounder）？如何設計對照才能確認是「真的耦合」而非「抽取變好」？</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

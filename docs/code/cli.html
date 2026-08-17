@@ -139,6 +139,65 @@
 <div class="callout"><strong>看完這頁你應該能說出</strong>：CLI 的兩層結構、broken pipe 為何重要、hook-guard 跟 install 的關係、<code>install/uninstall</code> 為什麼被拆到 install.py。指令的行為詳解在 <a href="../../docs/index.html">文件教學</a> 與 README 的 <a href="https://github.com/Graphify-Labs/graphify/blob/v8/README.md#full-command-reference">full command reference</a>。</div>
 </div>
 
+<!-- Round 1 Deepening (深度加深) -->
+
+<style>
+.advanced-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #9b59b6; }
+.advanced-section h2 { margin-top: 0; color: #7d3c98; font-size: 1.25rem; }
+.advanced-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.advanced-section th, .advanced-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.advanced-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.advanced-section ul, .advanced-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.advanced-section li { margin: 0.25rem 0; }
+.advanced-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.advanced-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+.advanced-section .callout.warn { background: #fdf3e7; border-left: 3px solid #f39c12; }
+</style>
+
+<div class="advanced-section">
+
+<h2>① 進階真實情境 Worked Example：把 graphify 塞進 CI 的「六個不可中斷的呼叫」</h2>
+<p>前面是「看懂 CLI 兩層結構」；這次是<strong>把 CLI 當 CI 元件</strong>：你的 CI pipeline 要在每次 PR 跑一連串 graphify 指令，且「任何一個失敗都要有明確訊息」。</p>
+<ol>
+<li><strong>建圖與檢查</strong>：<code>graphify extract .</code> 建圖；接 <code>graphify report</code> 或檢查 <code>built_at_commit</code> 確認圖新鮮。</li>
+<li><strong>技能健康</strong>：<code>graphify --check-skill-version</code>（或對應旗標）確認 skill 與套件版本一致——避免 CI 環境裝了舊 skill 配新套件。</li>
+<li><strong>hook-guard 測試</strong>：在 CI 跑一次 <code>graphify hook-guard</code> 模擬 agent 搜尋前的行為——驗證 always-on 機制在 CI 環境（可能沒裝 GUI、Windows runner）也能跑。</li>
+<li><strong>基準回歸</strong>：<code>graphify benchmark graphify-out/graph.json</code> 對比 README 數字，建立「準確度回歸門檻」。</li>
+<li><strong>資料完整性</strong>：<code>graphify diagnose</code>（或 validate 路徑）檢查圖檔大小上限（512 MiB）與 schema。</li>
+<li><strong>輸出給下游</strong>：<code>graphify export --svg --graphml</code> 產出 CI artifact，附在 PR 上供人工檢視。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：CLI 的價值在「<strong>可腳本化、可稽核、失敗即明確錯誤</strong>」——每個 subcommand 都是獨立程序，退出碼與 stderr 可被 CI 解讀；<code>--json</code> 輸出可被下游客器解析。更重要的是 broken pipe 處理：<code>graphify query … | head</code> 在 CI 裡會遇到，處理得當才不會把成功誤判成失敗。</div>
+
+<h2>② 深入原理擴充：broken pipe、hook-guard、與「CLI 也是產品」的設計哲學</h2>
+<p>cli 頁那些「小工具」其實藏著產品思維：</p>
+<ul>
+<li><strong>BrokenPipeError 被當成成功（issue #1807）</strong>：<code>graphify query | head</code> 時下游提早關閉 stdout，Python 在 flush 時拋 BrokenPipeError 並以 255 結束——CI/agent harness 會誤判。解法是 <code>_silence_broken_pipe()</code>：把 stdout 導到 devnull 後 <code>sys.exit(0)</code>。這是一個「懂 Unix 慣例」的相容層。</li>
+<li><strong>hook-guard 從 bash 一行流搬進 Python（issue #522）</strong>：舊 hook 是內嵌 <code>python -c "…"</code>，Windows cmd/PowerShell 解析不了。改成 <code>graphify hook-guard</code> subcommand 後，sh/cmd/PowerShell 都能跑——「跨平台」不是口號，是實作決策。</li>
+<li><strong>install/uninstall 被拆到 install.py</strong>：0.8.x 重構把「裝 skill」與「跑圖」分離，<code>__main__.py</code> 只剩 re-export。職責單一讓測試可以只 mock 一部分。</li>
+<li><strong>UTF-8 reconfigure</strong>：<code>_run_cli()</code> 開場對 stdout/stderr <code>reconfigure(encoding="utf-8")</code>——跨平台中文輸出（含本站）不亂碼。</li>
+</ul>
+<div class="callout warn"><strong>大家以為建圖正確、但其實有誤的案例</strong>：以為「<code>graphify query</code> 走過的路徑就是建圖時驗證過的路徑」。其實 query 是<strong>對 graph.json 的即時檢索</strong>——如果圖是用舊語料建的、或增量更新漏了某些檔，query 會「正確地」回傳<strong>正確圖裡的錯誤答案</strong>。最常見的是「改了檔案但忘了 <code>graphify update</code>」：graph.json 停在舊 commit，query 卻照常回應。CLI 不會提醒你圖過期——把「檢查 built_at_commit」寫進你的工作流程，而不是期待工具自動發現。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+<tr><td>CI 把成功查詢判成失敗（exit 255）</td><td>下游 pipe 關閉造成 BrokenPipeError 未處理</td><td>確認版本含 <code>_silence_broken_pipe</code>（issue #1807）；升級 graphify</td></tr>
+<tr><td>Windows runner 上 hook 不執行</td><td>舊版 hook 是 bash 一行流，cmd/PowerShell 解析不了</td><td>改用 <code>graphify hook-guard</code> subcommand 形式（issue #522）</td></tr>
+<tr><td>query 回答與最新程式碼不符</td><td>圖過期：改了檔但沒 <code>graphify update</code></td><td>檢查 <code>built_at_commit</code>；養成修改後 update 的習慣（AGENTS.md 規則）</td></tr>
+<tr><td><code>--json</code> 輸出在 CI 解析失敗</td><td>stderr 混入警告（skill 版本提示等）污染了 stdout</td><td>確認警告走 stderr；CI 只吃 stdout；或先跑 <code>--check-skill-version</code> 淨化環境</td></tr>
+<tr><td>skill 版本比套件新、install 被拒</td><td>skill 更新領先 pip 套件（issue #1568）</td><td>升級套件而非降級 skill；確認 references/ 側車存在</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+<li>broken pipe 的解法是把「失敗」轉成 exit 0。請討論這個決策在「資料丟失」情境的風險：如果下游被 <code>head -1</code> 截斷，退出碼 0 會隱藏「輸出被截斷」的事實。你怎麼在「尊重 pipe 慣例」與「誠實報告」之間取捨？</li>
+<li>hook-guard 從 bash 搬進 Python 是為跨平台。請列舉另一個「藏在 CLI 實作裡、其實是為了跨平台/跨 harness 而存在」的設計，並說明它對應哪個 issue 或問題。</li>
+<li>設計一個「圖新鮮度檢查」的 CLI 子命令：<code>graphify fresh</code>，輸入 repo 根，輸出「圖是否落後 HEAD」並給 exit code。列出它的判斷規則與邊界案例（未 commit 的變更算不算？）。</li>
+</ol>
+
+</div>
+<!-- End Round 1 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
