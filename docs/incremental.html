@@ -244,6 +244,63 @@ communities = cluster(G)      # unchanged</code></pre>
 </div>
 <!-- End Round 1 Deepening -->
 
+<!-- Round 2 Deepening (深度加深 #2) -->
+
+<style>
+.r2-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #0d9488; }
+.r2-section h2 { margin-top: 0; color: #0f766e; font-size: 1.25rem; }
+.r2-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.r2-section th, .r2-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.r2-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.r2-section ul, .r2-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.r2-section li { margin: 0.25rem 0; }
+.r2-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.r2-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="r2-section">
+
+<h2>① 專案級端到端 Worked Example：CI/CD 管線中的增量建圖 + 去重 + 成本控制</h2>
+<p>前面的 Worked Example 是維運情境的 nightly job。這次是<strong>CI/CD 整合</strong>：你們的 monorepo（500 檔 Python + 200 檔 TypeScript）用 GitHub Actions，每次 PR 要跑圖分析、每次 merge 要更新圖、預算控制在每月 $20 以內。</p>
+<ol>
+<li><strong>PR 階段（增量 + --check）</strong>：PR 觸發 <code>graphify extract . --check-drift</code>——自動偵測到 manifest.json → 增量模式 → 只重抽變更檔案 → 如果圖跟程式碼不同步就 fail check。這防止「圖過期」的 PR 被合併。</li>
+<li><strong>Merge 階段（全量更新）</strong>：merge 到 main 後跑 <code>graphify extract .</code>——增量更新圖 + 用 <code>--max-spend 5</code> 限制每次 merge 的 token 預算。Manifest 只在成功完成後寫入，即使 CI 當機也不弄壞下一次 diff。</li>
+<li><strong>去重品質追蹤</strong>：每週跑一次 <code>graphify extract --dedup-llm</code>（啟用 LLM 仲裁），比較啟用前後的節點數——如果差異 >5%，代表七步去重的 Jaro-Winkler 閾值可能太鬆。</li>
+<li><strong>成本儀表板</strong>：從 spend ledger 聚合每月的 token 消耗——拆成 Pass 1（免費）vs Pass 3（花 token）vs dedup-llm（可選），確保 Pass 3 佔比 <80%。</li>
+<li><strong>季度全量重建</strong>：<code>graphify extract . --no-cache</code>——消除增量累積的去重偏差，比較重建前後的圖差異（社群數、god nodes、節點數）。</li>
+</ol>
+<div class="callout info"><strong>預期成本</strong>：500+200 檔的 monorepo，每次 PR 增量約 $0.01-0.05（只抽變更檔案），每月 ~20 次 merge ≈ $0.2-1.0。Pass 3 的 LLM 成本集中在首次建圖，之後增量的 LLM 成本趨近於零（快取命中）。</div>
+
+<h2>② 效能/品質/安全深度</h2>
+<table>
+<tr><th>面向</th><th>考量</th><th>實務建議</th></tr>
+<tr><td><strong>效能</strong></td><td>MinHash/LSH 去重在 1 萬節點 <1 秒；但 union-find 合併後的邊重指向可能改變圖結構</td><td>監控去重前後的節點數/邊數比；如果邊數下降 >10%，代表去重把不同實體誤併</td></tr>
+<tr><td><strong>品質</strong></td><td>manifest.json 是 diff 的真相來源；中途當機時下次以舊 manifest 為基準</td><td>確認 manifest 只在成功完成後寫入（設計如此）；定期用 <code>graphify extract --check-drift</code> 驗證圖與程式碼同步</td></tr>
+<tr><td><strong>安全</strong></td><td>semantic cache 的 key 含 prompt fingerprint；prompt 一改快取自動失效</td><td>版本化你的 extraction-spec；不要手動改 cache 檔案；<code>--no-cache</code> 會清空整個快取目錄</td></tr>
+</table>
+
+<h2>③ 文件間比較對照表</h2>
+<table>
+<tr><th>面向</th><th>本文（增量更新）</th><th>相關文</th><th>差異說明</th></tr>
+<tr><td>增量機制</td><td>manifest.json 自動偵測 + detect_incremental + build_merge</td><td><a href="architecture.html">架構總覽</a></td><td>架構頁只描述靜態 pipeline（detect→export），不涉及增量模式</td></tr>
+<tr><td>去重</td><td>七步去重管線（精確正規化→LLM 仲裁）</td><td><a href="how-it-works.html">運作原理</a></td><td>運作原理頁講信任標籤（EXTRACTED/INFERRED），不涉及去重邏輯</td></tr>
+<tr><td>快取</td><td>semantic cache 含 prompt fingerprint 失效條件</td><td><a href="code/ops.html">程式碼對照 · ops</a></td><td>程式碼對照頁逐函數講 <code>check_semantic_cache</code>、<code>save_semantic_cache</code></td></tr>
+<tr><td>測試</td><td>五種測試類型（單元/整合/增量/改名/刪除）</td><td><a href="worked.html">實作案例</a></td><td>實作案例頁展示真實產出的 GRAPH_REPORT，但不展示增量測試過程</td></tr>
+</table>
+
+<h2>④ 互動式檢核清單</h2>
+<ul>
+<li>- [ ] 能在一個有 10 個檔案的目錄上跑兩次 <code>graphify extract .</code>，第二次觀察到「只有 1 個 changed」的增量行為</li>
+<li>- [ ] 能解釋 manifest.json 的「成功才寫入」語義，並設計一個失敗注入實驗證明中途當機的安全性</li>
+<li>- [ ] 能手動計算兩個 label 的 MinHash Jaccard 相似度（給定 3-gram 候選），並判斷是否通過 LSH threshold</li>
+<li>- [ ] 能解釋為什麼「同社群加分 +0.05」在首次建圖時無效（因為尚無社群），以及這對第一次去重的影響</li>
+<li>- [ ] 能設定一個 cron job，在每晚增量建圖後用 <code>graphify benchmark</code> 驗證圖的品質指標</li>
+<li>- [ ] 能解釋 semantic cache 的 key 為什麼要含 prompt fingerprint，以及改 extraction-spec 後快取自動失效的機制</li>
+</ul>
+
+</div>
+<!-- End Round 2 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

@@ -218,6 +218,64 @@ Rules:
 </div>
 <!-- End Round 1 Deepening -->
 
+<!-- Round 2 Deepening (深度加深 #2) -->
+
+<style>
+.r2-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #0d9488; }
+.r2-section h2 { margin-top: 0; color: #0f766e; font-size: 1.25rem; }
+.r2-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.r2-section th, .r2-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.r2-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.r2-section ul, .r2-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.r2-section li { margin: 0.25rem 0; }
+.r2-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.r2-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="r2-section">
+
+<h2>① 專案級端到端 Worked Example：大型文件庫建圖專案——建圖 + 增量更新 + SQL 分析 + 跨 agent 整合</h2>
+<p>前面的 Worked Example 是「從零跑完 pipeline」和「CI 自動化」。這次是<strong>完整的專案生命週期</strong>：你維護一個 2000+ 檔的技術文件庫（含 Python 程式碼 + Markdown 文件 + SQL migration + 論文 PDF），要從零建圖、跑增量更新、用 SQL 做統計分析、最後把圖接進多個 AI agent。</p>
+<ol>
+<li><strong>首次全量建圖</strong>：<code>graphify extract corpus/</code>——Python 走 Pass 1（零 LLM）、Markdown/PDF 走 Pass 3（花 token），產出 graph.json + GRAPH_REPORT.md + graph.html。</li>
+<li><strong>觀察抽取比例</strong>：查看 GRAPH_REPORT 的 EXTRACTED/INFERRED/AMBIGUOUS 比例——純程式碼部分應 100% EXTRACTED，文件部分有 INFERRED。這告訴你哪些邊值得信賴。</li>
+<li><strong>設定增量排程</strong>：用 cron 每晚跑 <code>graphify extract corpus/</code>——manifest.json 自動偵測到已有圖，進入增量模式。只有變動的檔案被重抽，成本趨近於零。</li>
+<li><strong>SQL 即席分析</strong>：把 graph.json 倒進 SQLite（用 Docker MCP SQLite），跑 <code>SELECT community, COUNT(*) as size FROM nodes GROUP BY community ORDER BY size DESC</code> 看社群大小分佈，找出過大社群。</li>
+<li><strong>跨 agent 整合</strong>：在 Claude Code 裝 graphify skill（Step 0-9），在 OpenCode 也裝同一套——兩個 agent 都先讀圖再回答，且圖是同一份（共用 graphify-out/）。</li>
+<li><strong>季度重建</strong>：每季跑一次 <code>graphify extract corpus/ --no-cache</code> 全量重建，消除增量累積的去重偏差。</li>
+</ol>
+<div class="callout info"><strong>預期產出</strong>：一份「與 commit 同步」的知識圖譜，任何 agent 隨時可查；SQL 分析提供社群健康度儀表板；季度重建確保圖不漂移。整個專案的 LLM 成本集中在首次建圖與文件語料的 Pass 3，之後增量更新成本趨近於零。</div>
+
+<h2>② 效能/品質/安全深度</h2>
+<table>
+<tr><th>面向</th><th>考量</th><th>實務建議</th></tr>
+<tr><td><strong>效能</strong></td><td>14 個模組的 pipeline 串行執行；大語料（>10K 檔）的 build_graph 耗時可能達分鐘級</td><td>用 <code>ProcessPoolExecutor</code> 平行抽取（已內建）；對超大語料分批 extract 再 merge；監控 manifest.json 的大小（它記錄所有檔案 hash）</td></tr>
+<tr><td><strong>品質</strong></td><td>抽取品質直接決定圖品質；tree-sitter 解析失敗的檔案會靜默跳過</td><td>跑 <code>graphify extract --verbose</code> 看每個檔案的抽取狀態；定期檢視 AMBIGUOUS 邊比例（>10% 要查原因）；用 review.md 記錄已知的圖錯誤</td></tr>
+<tr><td><strong>安全</strong></td><td> ingestion 用戶端 URL 可能觸發 SSRF；MCP server 路徑穿越</td><td>所有 URL 經過 validate_url() 白名單；MCP 路徑強制在 graphify-out/ 內；ingest 前的 <code>&lt;untrusted_source&gt;</code> 包覆防 prompt injection</td></tr>
+</table>
+
+<h2>③ 文件間比較對照表</h2>
+<table>
+<tr><th>面向</th><th>本文（架構總覽）</th><th>相關文</th><th>差異說明</th></tr>
+<tr><td>Pipeline 階段</td><td>七階段：detect→export + 八個服務模組</td><td><a href="how-it-works.html">運作原理</a></td><td>運作原理深入講三遍處理的 Pass 1/2/3 細節；架構頁只列模組職責</td></tr>
+<tr><td>新增語言</td><td>5 步驟路線圖</td><td><a href="code/extractors.html">程式碼對照 · extractors</a></td><td>架構頁是概覽；程式碼對照頁逐函數講 extractor 的 tree-sitter 走訪邏輯</td></tr>
+<tr><td>安全設計</td><td>簡述 security.py 四個驗證函數</td><td><a href="security.html">安全模型</a></td><td>安全模型頁逐條威脅面解析（SSRF、XSS、prompt injection 等），深度遠超架構頁</td></tr>
+<tr><td>增量更新</td><td>未涵蓋</td><td><a href="incremental.html">增量更新</a></td><td>增量更新是獨立的設計文件，架構頁只描述靜態 pipeline</td></tr>
+</table>
+
+<h2>④ 互動式檢核清單</h2>
+<ul>
+<li>- [ ] 能畫出 14 個模組的分組圖：七個主線 pipeline + 七個服務模組，並標出每個模組的輸入/輸出類型</li>
+<li>- [ ] 能在一個新專案上從零執行 <code>graphify extract</code>，並解釋每階段的輸出（detect.json → extraction chunks → graph.json）</li>
+<li>- [ ] 能新增一個自訂語言的 extractor（至少 20 行 tree-sitter 走訪），並跑通 <code>pytest tests/ -q</code></li>
+<li>- [ ] 能用 <code>graphify query</code>、<code>graphify path</code>、<code>graphify explain</code> 三個指令回答「某個函數被誰呼叫」「兩個模組間的最短路徑」</li>
+<li>- [ ] 能解釋 security.py 的四個驗證函數在 pipeline 的哪個階段被呼叫，並手動測試至少兩個</li>
+<li>- [ ] 能設定增量更新（cron 或 hook），並觀察第二次跑時的成本差異（manifest.json 輸出的 cached/changed 數字）</li>
+</ul>
+
+</div>
+<!-- End Round 2 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

@@ -169,6 +169,63 @@ Non-goals:
 </div>
 <!-- End Tutorial Sections -->
 
+<!-- Round 2 Deepening (深度加深 #2) -->
+
+<style>
+.r2-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #0d9488; }
+.r2-section h2 { margin-top: 0; color: #0f766e; font-size: 1.25rem; }
+.r2-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.r2-section th, .r2-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.r2-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.r2-section ul, .r2-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.r2-section li { margin: 0.25rem 0; }
+.r2-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.r2-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="r2-section">
+
+<h2>① 專案級端到端 Worked Example：為 2000 節點圖設計摘要方案並驗證成效</h2>
+<p>前面是設計你自己的摘要方案。這次是<strong>完整的摘要實作與驗證</strong>：你有一個 2000 節點的圖，要實作摘要功能、測量它對 agent 查詢的幫助、最後決定 Option A 還是 Option B。</p>
+<ol>
+<li><strong>分析需求</strong>：列出 agent 最常問的導覽問題（「這個檔案做什麼？」、「哪些檔案與 auth 相關？」），統計目前的回答需要幾次額外讀檔。</li>
+<li><strong>實作確定性摘要</strong>：寫一個 Python script 從 graph.json 的每個檔案級節點提取：docstring（如果有）、匯出符號、重要 import、主導圖關係、社群 label。產出 200-300 字元的摘要。</li>
+<li><strong>測量成效</strong>：用 50 個導覽問題測試——有摘要 vs 無摘要的「額外讀檔次數」和「回答準確度」。如果摘要能把「額外讀檔」從平均 3 次降到 1 次，代表摘要有效。</li>
+<li><strong>選擇方案</strong>：如果圖大小增加 <5%（2000 × 300 bytes ≈ 600KB），選 Option A（放 graph.json）；如果圖大小增加 >20%，選 Option B（sidecar）。</li>
+<li><strong>整合驗證</strong>：把摘要接進 <code>graphify explain</code>，確認有摘要時「回答更快、更準」。寫進 review.md 記錄成效。</li>
+</ol>
+<div class="callout info"><strong>關鍵價值</strong>：摘要的價值在「減少 agent 的額外讀檔」——如果 agent 每次回答「這個檔案做什麼？」都要打開原始檔，那圖的壓縮效益被打了折扣。摘要讓 agent 能用一句話選對檔案，只在需要深入時才讀原始碼。</div>
+
+<h2>② 效能/品質/安全深度</h2>
+<table>
+<tr><th>面向</th><th>考量</th><th>實務建議</th></tr>
+<tr><td><strong>效能</strong></td><td>2000 節點 × 300 bytes = 600KB 額外 payload；Option A 把這加進 graph.json</td><td>計算你的 graph.json 目前大小；如果已經 >5MB，600KB 的增加是 <12%，可接受；如果 <1MB，600KB 的增加是 60%，考慮 Option B</td></tr>
+<tr><td><strong>品質</strong></td><td>確定性摘要的品質取決於「本機訊號」的豐富度——沒有 docstring 的檔案摘要品質差</td><td>追蹤「空摘要」比例（>30% 要改進摘要 script）；用 <code>generated_by</code> 區分確定性與 LLM 摘要</td></tr>
+<tr><td><strong>安全</strong></td><td>摘要可能洩漏敏感資訊（如 API key 在 docstring 裡）</td><td>摘要 script 應過濾含 <code>key</code>、<code>secret</code>、<code>token</code> 的 docstring；或只取第一句</td></tr>
+</table>
+
+<h2>③ 文件間比較對照表</h2>
+<table>
+<tr><th>面向</th><th>本文（RFC：檔案級節點摘要）</th><th>相關文</th><th>差異說明</th></tr>
+<tr><td>摘要設計</td><td>Option A（放 graph.json）vs Option B（sidecar）的優缺點</td><td><a href="architecture.html">架構總覽</a></td><td>架構頁講 graph.json 的 schema（node-link 格式）；RFC 頁討論是否擴展 schema</td></tr>
+<tr><td>Agent 導覽</td><td>減少重複讀檔、<code>graphify explain</code> 顯示摘要</td><td><a href="skill-files.html">技能檔結構</a></td><td>技能檔頁講 Fast path 跳過建圖直接 query；RFC 頁講如何讓 query 的結果更豐富</td></tr>
+<tr><td>儲存模型</td><td>Option A 的單一 artifact 簡潔 vs Option B 的 sidecar 精簡</td><td><a href="incremental.html">增量更新</a></td><td>增量頁講 manifest.json 的持久化；RFC 頁討論摘要的儲存模型取捨</td></tr>
+<tr><td>確定性</td><td>預設不呼叫 LLM、用本機訊號產生摘要</td><td><a href="how-it-works.html">運作原理</a></td><td>運作原理頁講 Pass 1 的確定性抽取；RFC 頁講確定性摘要的產生邏輯</td></tr>
+</table>
+
+<h2>④ 互動式檢核清單</h2>
+<ul>
+<li>- [ ] 能解釋 Option A（放 graph.json）與 Option B（sidecar）各自的優缺點，並根據圖大小做出選擇</li>
+<li>- [ ] 能為一個沒有 docstring 的 Python 檔案設計一個 200-300 字元的確定性摘要（用匯出符號 + import + 圖關係）</li>
+<li>- [ ] 能解釋「預設不輸出摘要」的設計理由（保持向後相容、不強迫使用者付出 token 成本）</li>
+<li>- [ ] 能測量摘要的成效：有摘要 vs 無摘要的「額外讀檔次數」差異</li>
+<li>- [ ] 能解釋摘要與 <code>graphify explain</code> 的整合方式，並說明「有摘要時回答更快」的機制</li>
+<li>- [ ] 能設計一個安全過濾規則，防止摘要洩漏 API key 或其他敏感資訊</li>
+</ul>
+
+</div>
+<!-- End Round 2 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

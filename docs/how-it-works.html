@@ -278,6 +278,63 @@ Hyperedges (group relationships connecting 3+ nodes) live in G.graph["hyperedges
 </div>
 <!-- End Round 1 Deepening -->
 
+<!-- Round 2 Deepening (深度加深 #2) -->
+
+<style>
+.r2-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #0d9488; }
+.r2-section h2 { margin-top: 0; color: #0f766e; font-size: 1.25rem; }
+.r2-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.r2-section th, .r2-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.r2-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.r2-section ul, .r2-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.r2-section li { margin: 0.25rem 0; }
+.r2-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.r2-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="r2-section">
+
+<h2>① 專案級端到端 Worked Example：混合語料知識庫——從三遍抽取到長期演進追蹤</h2>
+<p>前面的 Worked Example 比較兩份語料、做架構考古。這次是<strong>同一個專案的完整生命週期</strong>：你有一個 500 檔的混合語料（200 Python + 150 Markdown + 50 PDF + 60 SQL + 40 圖片），要從零建圖、跑多次增量、追蹤社群演化、最後產出一份「專案知識演進報告」。</p>
+<ol>
+<li><strong>首次建圖</strong>：<code>graphify extract corpus/</code>——Pass 1 處理 260 個程式碼/SQL 檔（零 LLM），Pass 2 跳過（無影音），Pass 3 處理 240 個文件/圖片（花 token）。記下 spend ledger 與 EXTRACTED/INFERRED 比例。</li>
+<li><strong>三次增量</strong>：每週修改 ~30 個檔案後跑 <code>graphify extract corpus/</code>——觀察 manifest.json 的 changed/cached 數字，確認增量模式生效。追蹤圖的 nodes/edges/社群數變化。</li>
+<li><strong>社群演化追蹤</strong>：每次建圖後記錄社群數與 god nodes——用 <code>graphify report</code> 取 god nodes 清單，比較三次增量後的變化。「核心抽象有沒有變？新增的社群代表什麼子系統？」</li>
+<li><strong>SQL 分析</strong>：把最終 graph.json 倒進 SQLite，跑「社群大小分佈」「EXTRACTED vs INFERRED 邊比例」「跨社群邊（import cycles）」查詢，產出一份「圖健康度儀表板」。</li>
+<li><strong>季度重建</strong>：<code>graphify extract corpus/ --no-cache</code>——全量重建消除增量累積的去重偏差，比較重建前後的圖差異。</li>
+</ol>
+<div class="callout info"><strong>關鍵觀察</strong>：混合語料的 INFERRED 邊比例會比純程式碼語料高得多——這是正常的。追蹤這個比例的變化比追蹤絕對數字更有意義：如果 INFERRED 比例突然升高，代表新增的文件語料抽取品質可能有問題。</div>
+
+<h2>② 效能/品質/安全深度</h2>
+<table>
+<tr><th>面向</th><th>考量</th><th>實務建議</th></tr>
+<tr><td><strong>效能</strong></td><td>三遍處理中 Pass 3（LLM）是瓶頸；SHA256 快取在增量模式下跳過未變檔案</td><td>純程式碼語料完全跳過 Pass 3；用 <code>--code-only</code> 強制跳過；監控 <code>graphify-out/cache/</code> 大小避免快取膨脹</td></tr>
+<tr><td><strong>品質</strong></td><td>Leiden 社群偵測的確定性依賴排序重組 + 固定 seed；語意抽取品質影響社群形狀</td><td>不要手動改 <code>G.nodes()</code> 順序；用 <code>graphify extract --verbose</code> 監控每檔案的抽取結果；定期跑 <code>graphify report</code> 檢查 god nodes</td></tr>
+<tr><td><strong>安全</strong></td><td>Pass 3 的 LLM 處理攻擊者可控的文件內容</td><td><code>&lt;untrusted_source&gt;</code> 雜湊戳記包覆 + <code>_neutralise_injection_sentinels()</code> 解除 jailbreak 記號；這是 table-stakes 防禦，不是無敵</td></tr>
+</table>
+
+<h2>③ 文件間比較對照表</h2>
+<table>
+<tr><th>面向</th><th>本文（運作原理）</th><th>相關文</th><th>差異說明</th></tr>
+<tr><td>三遍處理</td><td>Pass 1/2/3 的概覽與 token 節省數字</td><td><a href="architecture.html">架構總覽</a></td><td>架構頁列模組職責表，不深入三遍處理的內部機制</td></tr>
+<tr><td>社群偵測</td><td>Leiden 演算法 + 確定性 + hub 排除</td><td><a href="code/analysis.html">程式碼對照 · analysis</a></td><td>程式碼對照頁逐函數講 <code>_partition()</code>、<code>exclude_hubs_percentile</code>、relabel</td></tr>
+<tr><td>信任標籤</td><td>EXTRACTED/INFERRED/AMBIGUOUS + 離散級距</td><td><a href="incremental.html">增量更新</a></td><td>增量頁的去重步驟也使用信任標籤做合併決策</td></tr>
+<tr><td>Token 經濟</td><td>省 token 倍數表（52 檔 71.5×）</td><td><a href="benchmarks.html">效能基準</a></td><td>效能基準用 LOCOMO/LongMemEval 做跨系統比較；運作原理頁只做內部基準</td></tr>
+</table>
+
+<h2>④ 互動式檢核清單</h2>
+<ul>
+<li>- [ ] 能畫出三遍處理的流程圖，標出「哪些步驟花 LLM token、哪些不花」</li>
+<li>- [ ] 能解釋為什麼「52 檔省 71.5×、6 檔只省 ~1×」——圖的壓縮效益與語料大小的關係</li>
+<li>- [ ] 能手動計算一個 5 節點圖的 Leiden 分群結果（給定邊列表），並解釋 hub 排除的效果</li>
+<li>- [ ] 能解釋 EXTRACTED 固定 1.0、INFERRED 用離散級距（0.95/0.85/0.75/0.65/0.55）的設計理由</li>
+<li>- [ ] 能用 <code>graphify extract --verbose</code> 監控一次完整建圖的 Pass 1/2/3 分佈，並判斷哪個 Pass 是瓶頸</li>
+<li>- [ ] 能解釋 SHA256 快取的失效條件（檔案內容變、prompt fingerprint 變、<code>--no-cache</code>）</li>
+</ul>
+
+</div>
+<!-- End Round 2 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

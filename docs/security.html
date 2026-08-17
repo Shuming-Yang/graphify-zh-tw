@@ -183,6 +183,63 @@
 </div>
 <!-- End Round 1 Deepening -->
 
+<!-- Round 2 Deepening (深度加深 #2) -->
+
+<style>
+.r2-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #0d9488; }
+.r2-section h2 { margin-top: 0; color: #0f766e; font-size: 1.25rem; }
+.r2-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.r2-section th, .r2-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.r2-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.r2-section ul, .r2-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.r2-section li { margin: 0.25rem 0; }
+.r2-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.r2-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="r2-section">
+
+<h2>① 專案級端到端 Worked Example：為多 agent 共享環境建立安全審計管線</h2>
+<p>前面的 Worked Example 是測試驗證函數和團隊入口。這次是<strong>合規導向的部署</strong>：你的組織要把 graphify 裝在共享工作站，讓 3 個不同 agent（Claude Code、OpenCode、Cursor）都能使用，要求「每次 ingest 都有稽核紀錄、所有安全驗證可自動化測試、漏洞有通報流程」。</p>
+<ol>
+<li><strong>環境隔離</strong>：graphify-out 放在共享 volume；三個 agent 的 skill 安裝在各自 scope（Claude Code: <code>~/.claude/skills/</code>、OpenCode: <code>~/.config/opencode/skills/</code>、Cursor: <code>~/.cursor/skills/</code>）；MCP 只以 stdio transport 啟動。</li>
+<li><strong>安全 smoke test CI</strong>：在 CI 跑一組 <code>pytest tests/test_security.py</code>——涵蓋 <code>validate_url</code> 擋 metadata IP、<code>validate_graph_path</code> 擋路徑穿越、<code>sanitize_label</code> 清控制字元、<code>safe_fetch</code> 擋 50MB。每次 merge 前自動執行。</li>
+<li><strong>Ingest 稽核</strong>：所有 ingest 的 URL 記錄到 <code>graphify-out/ingest-audit.log</code>（來源、時間、HTTP 狀態、大小），方便事後審查。用 <code>grep "169.254" ingest-audit.log</code> 檢查有無嘗試存取 metadata endpoint。</li>
+<li><strong>Content 審查</strong>：跑 <code>graphify extract</code> 後檢查 GRAPH_REPORT 的 AMBIGUOUS 邊——任何來自未知來源的可疑節點都要人工檢視。</li>
+<li><strong>漏洞通報</strong>：把 SECURITY.md 的「private vulnerability reporting、48h 回覆」貼進團隊章程，規定不開公開 issue。每季演練一次通報流程。</li>
+</ol>
+<div class="callout info"><strong>為什麼選這條路徑</strong>：多 agent 共享環境的安全不是「裝一次就夠」——每個 agent 的 skill 安裝位置不同、hook 機制不同、always-on 配置不同。安全審計管線確保「所有 agent 都走同一套驗證」，而稽核紀錄讓你能在事後追溯「哪個 agent 在什麼時候抓了什麼 URL」。</div>
+
+<h2>② 效能/品質/安全深度</h2>
+<table>
+<tr><th>面向</th><th>考量</th><th>實務建議</th></tr>
+<tr><td><strong>效能</strong></td><td>validate_url 的 DNS 解析 + 逐 IP 檢查有延遲；SSRFGuardedHTTPConnection 每個連線只解析一次 DNS</td><td>不要 monkey-patch 全域 <code>getaddrinfo</code>（併發下是 TOCTOU 隱患）；用子類別化 connection 確保每個連線驗證一次</td></tr>
+<tr><td><strong>品質</strong></td><td>prompt injection 防禦是「table-stakes」——讓攻擊從第一次就成功變成需要繞過</td><td>不要移除 <code>_neutralise_injection_sentinels()</code>；確認 <code>&lt;untrusted_source&gt;</code> 包覆完整；定期更新已知 jailbreak 記號清單</td></tr>
+<tr><td><strong>安全</strong></td><td>圖 HTML 的 XSS 只被 <code>sanitize_label()</code> 的 HTML-escape 保護；如果 exporter 忘了走 <code>esc()</code>，XSS 仍可能</td><td>測 <code>&lt;img src=x onerror=alert(1)&gt;</code> 作為 label 跑 export；追蹤所有 exporter 的 <code>esc()</code> 覆蓋</td></tr>
+</table>
+
+<h2>③ 文件間比較對照表</h2>
+<table>
+<tr><th>面向</th><th>本文（安全模型）</th><th>相關文</th><th>差異說明</th></tr>
+<tr><td>威脅面</td><td>10 個威脅向量的逐條解析</td><td><a href="architecture.html">架構總覽</a></td><td>架構頁只簡述 security.py 四個驗證函數，不深入威脅面</td></tr>
+<tr><td>Prompt injection</td><td><code>&lt;untrusted_source&gt;</code> + sentinel 清理 + 系統提示</td><td><a href="how-it-works.html">運作原理</a></td><td>運作原理頁講信任標籤（EXTRACTED/INFERRED），不涉及 injection 防禦</td></tr>
+<tr><td>SSRF 防禦</td><td>validate_url + SSRFGuardedHTTPConnection 雙道防線</td><td><a href="code/ops.html">程式碼對照 · ops</a></td><td>程式碼對照頁逐函數講 <code>security.py</code>，含 DNS-rebind 防禦的時序</td></tr>
+<tr><td>MCP transport</td><td>stdio-only 預設、<code>--transport http</code> opt-in 綁 127.0.0.1</td><td><a href="docker-mcp-sqlite.html">Docker MCP + SQLite</a></td><td>Docker MCP 頁講 MCP 工具的容器化部署，不涉及 transport 安全</td></tr>
+</table>
+
+<h2>④ 互動式檢核清單</h2>
+<ul>
+<li>- [ ] 能手動測試 <code>validate_url</code> 擋掉 <code>http://169.254.169.254</code>（metadata endpoint）和 <code>http://127.0.0.1</code>（內網），並解釋為什麼這兩個要擋</li>
+<li>- [ ] 能畫出 SSRFGuardedHTTPConnection 的 DNS-rebind 防禦時序：validate → DNS1 → connect → DNS2 換 IP，並指出哪一步切斷了攻擊</li>
+<li>- [ ] 能設計一個 prompt injection 測試：用包含 <code>&lt;|im_start|&gt;</code> 和 <code>[INST]</code> 的 label 跑 <code>sanitize_label()</code>，確認這些記號被清除</li>
+<li>- [ ] 能解釋 <code>--transport http</code> 的安全邊界：綁 127.0.0.1、不開 CORS、需要什麼額外控制才能開放給同網段</li>
+<li>- [ ] 能設定一個 CI test，自動驗證所有安全驗證函數在每次 merge 前 pass</li>
+<li>- [ ] 能說明如何回報安全漏洞（private vulnerability reporting、不開公開 issue、48h 回覆承諾）</li>
+</ul>
+
+</div>
+<!-- End Round 2 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

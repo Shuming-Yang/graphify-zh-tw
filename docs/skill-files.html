@@ -225,6 +225,64 @@ corpus size. Do not ask the user to narrow. The graph is already built — use i
 </div>
 <!-- End Round 1 Deepening -->
 
+<!-- Round 2 Deepening (深度加深 #2) -->
+
+<style>
+.r2-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #0d9488; }
+.r2-section h2 { margin-top: 0; color: #0f766e; font-size: 1.25rem; }
+.r2-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.r2-section th, .r2-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.r2-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.r2-section ul, .r2-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.r2-section li { margin: 0.25rem 0; }
+.r2-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.r2-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="r2-section">
+
+<h2>① 專案級端到端 Worked Example：從 fragments 到四平台安裝——skill 檔的完整生命週期</h2>
+<p>前面的 Worked Example 是客製化自家 skill。這次是<strong>完整的 skill 開發生命週期</strong>：你要為一個新的 AI agent 平台（假設叫「AgentX」）新增 graphify skill 支援，從 fragments 改動到安裝驗證。</p>
+<ol>
+<li><strong>分析 AgentX 的 hook 機制</strong>：AgentX 支援 AGENTS.md + PreToolUse hook（類似 Claude Code）。在 <code>tools/skillgen/platforms.toml</code> 新增 AgentX 的條目：skill 檔名、安裝路徑、hook 類型。</li>
+<li><strong>改 fragments</strong>：如果 AgentX 有特殊的 hook 語法，改 <code>fragments/hooks.md</code> 加 AgentX 的 hook 片段。不要碰已產生的 SKILL.md。</li>
+<li><strong>產生與驗證</strong>：<code>python -m tools.skillgen</code>——確認 <code>skills/agentx/SKILL.md</code> 被正確產生。用 <code>--audit-coverage</code> 確認每個 heading 仍「單一居住」。</li>
+<li><strong>安裝測試</strong>：<code>graphify install --platform agentx</code>——確認 skill 檔被放到 AgentX 的安裝目錄。手動測試 <code>/graphify</code> 觸發後的行為。</li>
+<li><strong>更新 baseline</strong>：<code>python -m tools.skillgen --bless</code>——把 AgentX 的產物寫進 expected/，確保下次 <code>--check</code> 不會误報 drift。</li>
+<li><strong>文件更新</strong>：在 README 的「支援平台」表格加 AgentX，附安裝路徑與 hook 機制說明。</li>
+</ol>
+<div class="callout info"><strong>關鍵觀察</strong>：各平台的 SKILL.md 幾乎相同（>95%），差異只在 hook 片段和安裝路徑。這就是「輕量核心 + 按需載入 references」的設計價值——改一次 fragments，四個平台同時更新。</div>
+
+<h2>② 效能/品質/安全深度</h2>
+<table>
+<tr><th>面向</th><th>考量</th><th>實務建議</th></tr>
+<tr><td><strong>效能</strong></td><td>SKILL.md 本身 ~8KB，references/ 總計 ~50KB；agent 每次觸發都要載入</td><td>Fast path 是關鍵優化：graph.json 存在 + 自然語言問題 → 跳過建圖直接 query，省下全部 references 載入時間</td></tr>
+<tr><td><strong>品質</strong></td><td>skillgen 的 byte-diff 檢查確保 fragments 與 SKILL.md 同步；直接改 SKILL.md 會被打回</td><td>用 <code>python -m tools.skillgen --check</code> 做 pre-commit hook；用 <code>--audit-coverage</code> 確認沒有 heading 重複</td></tr>
+<tr><td><strong>安全</strong></td><td>SKILL.md 的 description 決定「何時被觸發」——太寬會誤觸、太窄會漏觸</td><td>description 保持「寬到觸發、窄到不誤觸」；<code>platforms.toml</code> 規定它「PRESERVED VERBATIM per platform」</td></tr>
+</table>
+
+<h2>③ 文件間比較對照表</h2>
+<table>
+<tr><th>面向</th><th>本文（技能檔結構）</th><th>相關文</th><th>差異說明</th></tr>
+<tr><td>Skill 流程</td><td>Step 0-9 + Fast path + references/ 側車</td><td><a href="architecture.html">架構總覽</a></td><td>架構頁講 pipeline 的七階段；技能檔頁講 agent 如何指揮 pipeline</td></tr>
+<tr><td>平台差異</td><td>四平台的安裝位置與 always-on 機制對照表</td><td><a href="code/skillgen.html">程式碼對照 · skillgen</a></td><td>程式碼對照頁講 <code>tools/skillgen</code> 的渲染管線與 <code>--check</code> 機制</td></tr>
+<tr><td>references/</td><td>8 篇參考檔的用途與載入時機</td><td><a href="how-it-works.html">運作原理</a></td><td>運作原理頁講三遍處理，不涉及 skill 檔的 references 載入邏輯</td></tr>
+<tr><td>Generated artifacts</td><td>fragments → skillgen → SKILL.md 的產生管線</td><td><a href="incremental.html">增量更新</a></td><td>增量頁講圖的增量更新；技能檔頁講 SKILL.md 的增量產生（drift check）</td></tr>
+</table>
+
+<h2>④ 互動式檢核清單</h2>
+<ul>
+<li>- [ ] 能解釋 SKILL.md 的 frontmatter <code>name</code> 和 <code>description</code> 各自決定什麼（安裝目錄名 vs 觸發時機）</li>
+<li>- [ ] 能修改 fragments 並重新產生 SKILL.md，然後用 <code>--check</code> 確認無 drift</li>
+<li>- [ ] 能解釋 Fast path 的三個觸發條件（graph.json 存在 + 自然語言問題 + 非重建指令），並說明「不要 check corpus size」的設計理由</li>
+<li>- [ ] 能列出四個平台（OpenCode、Claude Code、Codex、Cursor）的安裝路徑與 always-on 機制差異</li>
+<li>- [ ] 能診斷「助手對 codebase 問題不自動用 graphify」的原因（hook 未裝、plugin 沒設、description 不匹配）</li>
+<li>- [ ] 能用 <code>--audit-coverage</code> 確認每個 heading 仍「單一居住」在它的渲染裡</li>
+</ul>
+
+</div>
+<!-- End Round 2 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

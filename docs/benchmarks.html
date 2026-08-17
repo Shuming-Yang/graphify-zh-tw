@@ -240,6 +240,64 @@ python crosstool/run.py --repo erpnext --max-spend &lt;budget&gt;</code></pre>
 </div>
 <!-- End Round 1 Deepening -->
 
+<!-- Round 2 Deepening (深度加深 #2) -->
+
+<style>
+.r2-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #0d9488; }
+.r2-section h2 { margin-top: 0; color: #0f766e; font-size: 1.25rem; }
+.r2-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.r2-section th, .r2-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.r2-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.r2-section ul, .r2-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.r2-section li { margin: 0.25rem 0; }
+.r2-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.r2-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="r2-section">
+
+<h2>① 專案級端到端 Worked Example：為自家語料設計並執行一次完整基準</h2>
+<p>這次不是重現上游基準，而是<strong>從零設計基準</strong>：你有一個 300 份文件 + 100 個 Python 檔的內部知識庫，要回答「換成 graphify 當記憶層值不值得」。</p>
+<ol>
+<li><strong>建圖</strong>：<code>graphify extract corpus/</code>——記下 spend ledger（Pass 1 免費 + Pass 3 花 token）、nodes/edges/社群數。</li>
+<li><strong>設計評分集</strong>：請領域專家挑 50 個「查詢 + 必須涵蓋的原子事實」當 ground truth（模仿 LOCOMO 的 key-fact coverage 精神）。</li>
+<li><strong>建基線</strong>：用 BM25（<code>graphify benchmark</code> 或本地 script）跑同一組 50 題，得到「無圖」的 recall@10 對照。</li>
+<li><strong>測圖檢索</strong>：用 <code>graphify query</code>（graph-expand）對同一組 50 題取 recall@10，再用固定的 reader 模型答題。</li>
+<li><strong>量成本</strong>：對照 ingest 的 USD（<code>graphify extract</code> 的 token 統計）與搜尋的 token 用量，畫出「準確度/成本」座標。</li>
+<li><strong>產出報告</strong>：把結果寫成一份內部報告，附 spend ledger 和評分集，讓團隊能自行重現。</li>
+</ol>
+<div class="callout info"><strong>關鍵價值</strong>：基準的價值在「在你的語料上」——LOCOMO 的 0.497 是他人語料的數字，你的分佈（中英混雜、有程式碼有文件）可能完全不同。自建 harness 的好處是：共享 reader 與裁判、寫 spend ledger、連召回都只跟你的語料有關。</div>
+
+<h2>② 效能/品質/安全深度</h2>
+<table>
+<tr><th>面向</th><th>考量</th><th>實務建議</th></tr>
+<tr><td><strong>效能</strong></td><td>LOCOMO ingest $1.40 vs supermemory $15.67——11 倍差距來自「AST 建圖零 LLM」</td><td>純程式碼語料的建圖成本確實為 $0；但混合語料的 Pass 3 仍要花 token——引用「$0 建圖」時務必標注語料類型</td></tr>
+<tr><td><strong>品質</strong></td><td>coverage 公式的 0.5（部分涵蓋折半）是任意參數——改成 0 或 1 可能翻轉排名</td><td>讀基準時先問「評分機制的微小參數會不會改寫結論」；用自己的語料重現而非照抄上游數字</td></tr>
+<tr><td><strong>安全</strong></td><td>benchmark harness 的 spend ledger 應防篡改（預算超限要 fail）</td><td>用 <code>--max-spend</code> 硬上限；每次跑寫 per-run spend ledger；不要手動改 ledger</td></tr>
+</table>
+
+<h2>③ 文件間比較對照表</h2>
+<table>
+<tr><th>面向</th><th>本文（效能基準）</th><th>相關文</th><th>差異說明</th></tr>
+<tr><td>Token 經濟</td><td>LOCOMO $1.40 vs supermemory $15.67；建圖 $0</td><td><a href="how-it-works.html">運作原理</a></td><td>運作原理頁講「52 檔省 71.5×」的內部基準；效能基準頁做跨系統比較</td></tr>
+<tr><td>圖檢索</td><td>graph-expand vs SurrealDB engine 的 recall 比較</td><td><a href="incremental.html">增量更新</a></td><td>增量頁講圖的增量更新機制；效能基準頁講圖的查詢效能</td></tr>
+<tr><td>程式碼智慧</td><td>ERPNext 82.0% vs grep+read 70.8%</td><td><a href="worked.html">實作案例</a></td><td>實作案例頁展示單一專案的圖產出；效能基準頁量化「圖工具」的實際提升</td></tr>
+<tr><td>裁判驗證</td><td>90.6% 一致性、kappa 0.81</td><td><a href="architecture.html">架構總覽</a></td><td>架構頁不涉及裁判機制；效能基準頁詳細講 coverage 公式與盲驗</td></tr>
+</table>
+
+<h2>④ 互動式檢核清單</h2>
+<ul>
+<li>- [ ] 能解釋「公平規則」的四個條件（同一模型、同一 embedder、同一預算、零 LLM 建圖），並說明每一層被破壞的後果</li>
+<li>- [ ] 能手動計算 coverage 公式的值：給定 covered=3, partial=2, total=5，算出 (3+0.5×2)/5 = 0.8</li>
+<li>- [ ] 能解釋為什麼 supermemory 的 recall 0.149 不能直接跟 graphify 的 0.497 比（embedder 不同）</li>
+<li>- [ ] 能在自己的語料上設計一組 10 題的評分集，並用 <code>graphify query</code> 跑出 recall@10</li>
+<li>- [ ] 能比較 graph-expand 與 SurrealDB engine 的差異（圖展開 vs 資料庫索引），並解釋為什麼 LOCOMO 上 graph-expand 略勝</li>
+<li>- [ ] 能用 <code>--max-spend</code> 和 spend ledger 控制基準執行的 token 預算，並解釋「預算超限要 fail」的設計理由</li>
+</ul>
+
+</div>
+<!-- End Round 2 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

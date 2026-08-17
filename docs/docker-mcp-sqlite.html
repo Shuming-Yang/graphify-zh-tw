@@ -226,6 +226,63 @@ docker rmi mcp/sqlite:latest</code></pre>
 </div>
 <!-- End Round 1 Deepening -->
 
+<!-- Round 2 Deepening (深度加深 #2) -->
+
+<style>
+.r2-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #0d9488; }
+.r2-section h2 { margin-top: 0; color: #0f766e; font-size: 1.25rem; }
+.r2-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.r2-section th, .r2-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.r2-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.r2-section ul, .r2-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.r2-section li { margin: 0.25rem 0; }
+.r2-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.r2-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="r2-section">
+
+<h2>① 專案級端到端 Worked Example：從 graph.json 到 SQLite 即席分析再到 agent 查詢</h2>
+<p>前面是把 SQLite MCP 當獨立工作區或即席分析後端。這次是<strong>完整的「圖→SQL→agent」管線</strong>：你的團隊要用 SQL 查知識圖譜，且 agent 要能自動化這個流程。</p>
+<ol>
+<li><strong>建圖</strong>：<code>graphify extract corpus/</code>——產出 graph.json（node-link 格式）。</li>
+<li><strong>匯出到 SQLite</strong>：寫一個 Python script 把 graph.json 攤平成 nodes（id, label, file_type, community, degree）和 edges（source, target, relation, confidence）兩張表，用 <code>sqlite3</code> 批次插入。把 DB 檔放進 Docker named volume <code>mcp-sqlite</code>。</li>
+<li><strong>建立 MCP 工具</strong>：<code>docker mcp profile server add default --server catalog://mcp/docker-mcp-catalog/SQLite</code>——讓 agent 能用 SQL 查圖。</li>
+<li><strong>Agent 查詢</strong>：<code>docker mcp client connect claude-code</code> 後，agent 可以用 <code>read_query</code> 跑「SELECT community, COUNT(*) FROM nodes GROUP BY community」看社群大小分佈，或「SELECT * FROM edges WHERE confidence='AMBIGUOUS'」列待審邊。</li>
+<li><strong>持續同步</strong>：每次 <code>graphify extract</code> 更新圖後，自動跑匯出 script 更新 SQLite——用 cron 或 hook 確保圖與 SQL 同步。</li>
+</ol>
+<div class="callout info"><strong>預期產出</strong>：一份「SQL 可查」的知識圖譜，agent 能用 <code>read_query</code> 做跨維度分析（社群分佈、邊類型統計、god nodes 排名），而不只是 <code>graphify query</code> 的固定介面。Docker named volume 確保存續——重啟容器後分析成果還在。</div>
+
+<h2>② 效能/品質/安全深度</h2>
+<table>
+<tr><th>面向</th><th>考量</th><th>實務建議</th></tr>
+<tr><td><strong>效能</strong></td><td>Docker MCP 的 <code>tools call</code> 每次開新的 ephemeral gateway（~5 秒開銷）</td><td>對高頻查詢改用常駐 MCP server 而非 <code>tools call</code>；SQLite 的 WAL 模式支持並發讀</td></tr>
+<tr><td><strong>品質</strong></td><td>圖與 SQL 的同步延遲——<code>graphify extract</code> 更新圖後 SQL 還是舊的</td><td>用 hook 自動觸發匯出 script；在 SQL 查詢前驗證 <code>graph.json</code> 的 <code>built_at_commit</code></td></tr>
+<tr><td><strong>安全</strong></td><td>MCP 工具暴露給 agent 的是固定 6 個 SQLite 操作；agent 可能誤執行 <code>DROP TABLE</code></td><td>在 MCP 工具層做防護：只暴露 <code>read_query</code>（唯讀），或在 SQLite 層用 <code>PRAGMA</code> 限制寫入</td></tr>
+</table>
+
+<h2>③ 文件間比較對照表</h2>
+<table>
+<tr><th>面向</th><th>本文（Docker MCP + SQLite）</th><th>相關文</th><th>差異說明</th></tr>
+<tr><td>MCP 部署</td><td>Docker named volume + ephemeral gateway</td><td><a href="architecture.html">架構總覽</a></td><td>架構頁講 serve.py 的 MCP stdio server；Docker MCP 頁講容器化部署</td></tr>
+<tr><td>SQL 查詢</td><td>read_query / write_query / create_table 等 6 個工具</td><td><a href="how-it-works.html">運作原理</a></td><td>運作原理頁講圖的 query/path/explain 走訪；Docker MCP 頁講 SQL 即席查詢</td></tr>
+<tr><td>儲存持久化</td><td>Docker named volume <code>mcp-sqlite</code> → <code>/mcp/db.sqlite</code></td><td><a href="incremental.html">增量更新</a></td><td>增量頁講 manifest.json 的持久化；Docker MCP 頁講 SQLite 的持久化</td></tr>
+<tr><td>安全</td><td>MCP transport 選擇 + 工具暴露範圍</td><td><a href="security.html">安全模型</a></td><td>安全模型頁講 SSRF/XSS/prompt injection；Docker MCP 頁講 SQL 注入防護</td></tr>
+</table>
+
+<h2>④ 互動式檢核清單</h2>
+<ul>
+<li>- [ ] 能從零安裝 SQLite MCP（<code>docker mcp profile server add</code> + <code>docker pull</code>），並用冒煙測試驗證</li>
+<li>- [ ] 能解釋 named volume 如何確保 SQLite 資料在容器重啟後仍然存在</li>
+<li>- [ ] 能把 graph.json 匯出到 SQLite，並用 SQL 查詢「社群大小分佈」和「AMBIGUOUS 邊列表」</li>
+<li>- [ ] 能診斷「寫入後立刻讀取讀不到資料」的原因（不同 gateway / 不同 volume / 不同 DB 路徑）</li>
+<li>- [ ] 能解釋 MCP 工具的「無狀態運算 + 有狀態儲存」分隔模式，並說明 append_insight 的設計用途</li>
+<li>- [ ] 能解除安裝並清理所有資源（<code>docker mcp profile server remove</code> + <code>docker volume rm</code> + <code>docker rmi</code>）</li>
+</ul>
+
+</div>
+<!-- End Round 2 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>

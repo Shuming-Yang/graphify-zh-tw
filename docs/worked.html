@@ -259,6 +259,63 @@ graphify extract ./raw     # 純程式碼，不需 API key
 </div>
 <!-- End Round 1 Deepening -->
 
+<!-- Round 2 Deepening (深度加深 #2) -->
+
+<style>
+.r2-section { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary, #f8f9fa); border-radius: 8px; border-left: 4px solid #0d9488; }
+.r2-section h2 { margin-top: 0; color: #0f766e; font-size: 1.25rem; }
+.r2-section table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.r2-section th, .r2-section td { padding: 0.5rem 0.75rem; border: 1px solid var(--border, #e0e0e0); text-align: left; }
+.r2-section th { background: var(--bg-tertiary, #e9ecef); font-weight: 600; }
+.r2-section ul, .r2-section ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.r2-section li { margin: 0.25rem 0; }
+.r2-section .callout { margin: 1rem 0; padding: 0.75rem 1rem; border-radius: 6px; }
+.r2-section .callout.info { background: #e8f4fd; border-left: 3px solid #2196F3; }
+</style>
+
+<div class="r2-section">
+
+<h2>① 專案級端到端 Worked Example：用圖驅動的專案重構——從「看不懂」到「重構計畫」</h2>
+<p>前面是跑完案例和產出 onboarding 指南。這次是<strong>用圖驅動重構決策</strong>：你接手一個 1500 節點的 legacy 專案，要用 graphify 識別「哪些模組該拆、哪些耦合該解、重構優先序」。</p>
+<ol>
+<li><strong>建圖與初步分析</strong>：<code>graphify extract .</code> 建圖後，先讀 GRAPH_REPORT.md——找 god nodes（核心抽象）和 Surprising Connections（意外耦合）。</li>
+<li><strong>社群分析</strong>：用 <code>graphify query</code> 查「哪些社群最大？」→ 過大社群（>25% 節點）代表模組邊界模糊。用 <code>graphify explain &lt;god-node&gt;</code> 理解每個核心抽象的職責。</li>
+<li><strong>循環依賴偵測</strong>：用 <code>graphify path "ModuleA" "ModuleB"</code> 和 <code>graphify path "ModuleB" "ModuleA"</code> 找雙向路徑——循環依賴是重構的首要目標。</li>
+<li><strong>跨社群邊分析</strong>：從 graph.json 找出跨社群的 import/calls 邊——這些是「該解耦的介面」。用 <code>graphify explain</code> 確認每條跨社群邊的語義。</li>
+<li><strong>產出重構計畫</strong>：把分析結果整理成「重構優先序清單」：先解耦循環依賴 → 再拆過大社群 → 最後處理 Surprising Connections。附上互動 graph.html 連結讓團隊能視覺化驗證。</li>
+</ol>
+<div class="callout info"><strong>關鍵觀察</strong>：重構計畫的價值在於「基於圖結構而非主觀判斷」——god nodes 告訴你「哪些是核心抽象」、社群邊界告訴你「模組該怎麼拆」、循環依賴告訴你「哪裡耦合太深」。這是「用圖取代 grep」在重構場景的具體體現。</div>
+
+<h2>② 效能/品質/安全深度</h2>
+<table>
+<tr><th>面向</th><th>考量</th><th>實務建議</th></tr>
+<tr><td><strong>效能</strong></td><td>互動圖（graph.html）在節點破萬時可能 >1.8MB，瀏覽器載入慢</td><td>用 <code>_viz_node_limit</code> 防護先確認上限；超大圖改用 graph.json + D3.js 自訂視覺化</td></tr>
+<tr><td><strong>品質</strong></td><td>god nodes 的定義是「排除後的最高度數」，不是「最高度數」——排除了檔案節點、概念節點、內建型別</td><td>檢查 <code>_BUILTIN_NOISE_LABELS</code> 是否包含你的語言的內建型別；用 review.md 記錄已知的圖錯誤</td></tr>
+<tr><td><strong>安全</strong></td><td>互動圖的節點 label 可能含 XSS 攻擊向量</td><td>確認所有 exporter 走 <code>sanitize_label()</code> 的 HTML-escape；測 <code>&lt;script&gt;</code> 作為 label 跑 export</td></tr>
+</table>
+
+<h2>③ 文件間比較對照表</h2>
+<table>
+<tr><th>面向</th><th>本文（實作案例）</th><th>相關文</th><th>差異說明</th></tr>
+<tr><td>案例產出</td><td>五個案例的 GRAPH_REPORT + 互動圖 + review.md</td><td><a href="how-it-works.html">運作原理</a></td><td>運作原理頁講三遍處理的理論；實作案例頁展示真實產出</td></tr>
+<tr><td>God nodes</td><td>排除後的最高度數 + review.md 的「圖哪裡搞錯」</td><td><a href="architecture.html">架構總覽</a></td><td>架構頁只列 analyze.py 的職責；實作案例頁展示 god nodes 的實際含義</td></tr>
+<tr><td>互動圖</td><td>rsl-siege-manager 的 1.8MB 自含檔，可拖曳/縮放/搜尋</td><td><a href="code/export.html">程式碼對照 · export</a></td><td>程式碼對照頁講 <code>export.py</code> 的 pyvis/HTML 生成邏輯</td></tr>
+<tr><td>重現步驟</td><td>每個案例的 README.md 含完整重現步驟</td><td><a href="benchmarks.html">效能基準</a></td><td>效能基準頁講 harness 的重現方式；實作案例頁講單一案例的重現</td></tr>
+</table>
+
+<h2>④ 互動式檢核清單</h2>
+<ul>
+<li>- [ ] 能跑完 httpx 案例（<code>graphify extract ./raw</code>），並用 <code>graphify benchmark</code> 驗證 README 宣稱的數字</li>
+<li>- [ ] 能用 <code>graphify path</code> 找到兩個節點之間的路徑，並解釋路徑上每條邊的 EXTRACTED/INFERRED 標籤</li>
+<li>- [ ] 能用 <code>graphify explain</code> 理解一個 god node 的職責，並對照原始碼確認</li>
+<li>- [ ] 能解釋 review.md 中「圖哪裡搞錯了」的一個具體案例，並推測它在哪個 pipeline 階段被引入</li>
+<li>- [ ] 能比較不同案例的 nodes/edges/社群數量，並解釋為什麼「節點數不能跨 repo 比」</li>
+<li>- [ ] 能在互動圖中搜尋節點、查看資訊、用社群圖例勾選隱藏</li>
+</ul>
+
+</div>
+<!-- End Round 2 Deepening -->
+
 <footer>
   <div>這是 <a href="https://github.com/Graphify-Labs/graphify">Graphify-Labs/graphify</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/Graphify-Labs/graphify">Graphify Labs</a>（Apache-2.0）· 本站與 Graphify Labs 無關 · 對齊上游 v8 @ 9f25a3a</div>
